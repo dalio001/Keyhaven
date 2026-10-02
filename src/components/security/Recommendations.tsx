@@ -22,10 +22,10 @@ const TIPS = [
   {
     icon: FileDown,
     color: '#8B7CFF',
-    title: 'Print your Emergency Kit',
-    body: 'A paper copy of your recovery codes, kept somewhere only you can reach.',
+    title: 'Export an encrypted backup',
+    body: 'Keep a copy of your encrypted vault off this browser. It opens only with your master password — there is no other recovery.',
     to: '/settings',
-    cta: 'Recovery options',
+    cta: 'Backup options',
   },
   {
     icon: Smartphone,

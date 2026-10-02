@@ -19,7 +19,7 @@ const COLUMNS: { title: string; links: { label: string; to: string }[] }[] = [
     links: [
       { label: 'How it works', to: '/about' },
       { label: 'FAQ', to: '/#faq' },
-      { label: 'Recovery', to: '/about' },
+      { label: 'Backups', to: '/about' },
     ],
   },
   {

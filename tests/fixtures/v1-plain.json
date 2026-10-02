@@ -1,0 +1,73 @@
+{
+  "password": "synthetic-Correct-Horse-7731",
+  "payload": {
+    "entries": [
+      {
+        "id": "e-0001",
+        "title": "Example Mail",
+        "url": "https://mail.example.test",
+        "username": "tester@example.test",
+        "password": "synthetic-pw-Alpha-1!",
+        "category": "work",
+        "favorite": true,
+        "notes": "synthetic fixture entry",
+        "totp": true,
+        "totpSecret": "KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TFOQ",
+        "updatedAt": "2026-01-02T03:04:05.000Z",
+        "lastUsedAt": "2026-01-02T03:04:05.000Z",
+        "passwordHistory": [
+          {
+            "password": "synthetic-old-pw-0",
+            "changedAt": "2025-12-01T00:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "e-0002",
+        "title": "Example Stream",
+        "url": "https://stream.example.test",
+        "username": "viewer",
+        "password": "synthetic-pw-Beta-2?",
+        "category": "streaming",
+        "favorite": false,
+        "updatedAt": "2026-02-03T04:05:06.000Z",
+        "lastUsedAt": "2026-02-03T04:05:06.000Z",
+        "breached": false
+      }
+    ],
+    "settings": {
+      "autoLockMinutes": 7,
+      "clipboardClearSeconds": 25,
+      "remaskSeconds": 15
+    },
+    "recoveryCodes": [
+      "ABCD-EFGH-JKMN",
+      "PQRS-TUVW-XYZ2",
+      "3456-789A-BCDE",
+      "FGHJ-KMNP-QRST",
+      "UVWX-YZ23-4567",
+      "89AB-CDEF-GHJK",
+      "MNPQ-RSTU-VWXY",
+      "Z234-5678-9ABC"
+    ],
+    "futureField": {
+      "note": "unknown payload key that must survive round-trips"
+    }
+  },
+  "generatedFrom": "src/lib/crypto.ts @ 22d71d3 (pre-Phase-1); synthetic data only",
+  "totpSecret": null,
+  "record": {
+    "version": 1,
+    "salt": "rKsBAyvSK1eIOQuZflo44A==",
+    "kdf": {
+      "name": "PBKDF2",
+      "hash": "SHA-256",
+      "iterations": 10000
+    },
+    "verifier": "NdFPsJhApXpcUQ0JTHpuTR7jQmyHYJTSNr7YMSNfpmo=",
+    "blob": "eyJpdiI6IkY1UXl2QTNHN0lDM3JYejUiLCJjdCI6IjErRTN1WkFIRWpPSDkyOVd1bVJlc2Y3MGh0Y2lKVXcvUkMzbTY1ZzFodTE0YkFpOTZkVjNJdFBMZXkvKzI4R3ZQSFl2OWdPZ3k0UEpGMzVFVG4xamRsaERpRUMwV25ML3Rnd0xPQmtwWVNiQS9hMXRBQjNuVUJ3VithWVpwQTIvblFwTGZHRE1uMWNsR0JhQUJzaWtFQjl3ZVphRUhsWXdYQlpwU2FacG5EbUNyTjlTdDVmbTcwSGp6a3hKWHEzTzBValZJNGpEMXdjNnN0WmkycU1CWWpkUk9qYXZCWjBMSzB2N3diZmYxQSt3bk8wVkZQSzdoNE9GUXdrOWRwTWt0SUZwaUJRU2kzZ1kvUW82RmVNVUlWdmFxMkRqdFlRMWUzTnFLc3F0Q3F2N0JCZEJwYWhuWVExbjAwcnhEbVBZQ2hQTmpPSWlDZkJFWlFEZkNESVVRbzJ2M2w1Z1p1WStYVUJPdkR1RFBsajVickFaV1N0UGZQdjBCN0FydlhJOTZjMFBub2UvNGZSTnJka0NNdjBmTlNkdjB4SVRESlZaL3l5MTdCM3M1b2tCeUM5blF1dDBiN241dUNSNU5adjJIRkthU05rOW5aQlFnRy9BUE9DMlVqV2ZiSVk1QTVVMEhsSnhLZUpQRmxSU1dZQm82VGhscE5BNGFPY0Q5SUozNnBvdUh5ckJzTUZqelV4VEw2MTcvdzFyMS9iM1dqcnIrUllsZlR1aDF0UjhlNVhxNXlaNytRanBib25PampYK1V1cGRiUEQ3aklMRDZtNjR5Qm5mZ0tLd3R6V3RJTFVCRStLaCtQZGRrc2lRVFZ6UmFxOTI0ZGpNcDRnR0F5dlNjS0t6RjRDd1lTVi9oRjA0dXF4ZE1wYjJyWDB1MGpuZ2I0aVZyTUQ0a3pWbHRWd01YQmdyOU50MzVTczBRU0p5a1gzYUREQ3JQTWxOL1p2RWJCK2Urc28yS25iR0l2U0Rwd2l1dkFvUFdSdG40djlNV2gxeHYwemtMR1gwdGRVK2ZESU51WjRXT0N0MHY2U2IvOWtVTjZGSWw1cDhWSUg2WkNKcnAvWmFmdWtOb0JVdy9NcXVEeXNHTmZGcHZwbWxQOExGWUg1T3FLU3NkTlIyWS9oWDRyV0Z1cnViQXhNbUIwOHJOZDNRNTAxc1kySFdPNzN2NTFCRUZ3eGx5V2ZCUEc2R0FyY3RFS1ZXR1BhVDU0cFl1eWI1bDVTQ0FqZk1Md1laeDJwSnNUTUZ4MHhEMHFrWWNZRzlkWEs0MVltRUx1WFVjWlBOY29qRFVsMjAxOEluOHpBVWpOVVlrOG9Nb0JaSzh6UUIrcHZRUXNlMVpvek9GZS9QcHkyWStSQzllbXV2b3F3QjNUcUE0enhkTmdVWXhiandPa05SRGFJQmdjRGZXamplMVQwOTlQZGkzQTlxWHRkdVRlOUNRbktBS0F3RGtlRHRkQ0NRcCsrenpKUUdYS253NjBVZ2t2M3cxZXVML3hEQjRQakpYbVhtcWRzTm9MVzRtN095eU9pd0QwYXVrN1FyLzR1eXdHVHd3U3FWSHdTQy9WRndzUXZ0Z0xvNm5meXNmSkdwZkJYaHFOcUEyVzFKVEFnaS9PcWo0bmR4VHZLMGdoRGNaaHhnb0Ywb2VXSlh1MzFLbFdQaWpqOHFxTDRWNkVhdXBveU5kS3RSVXVJUG9qbzQva2tVdVI5VWRzUFpTbm9HNzUxMEp5eDRKNE42RkJTNzdjQkswbEgzTXpWbW5wZEMraFpKbjBsNzlCRXdvdmFrNVk4ZEJ4eUV4b094djE5TVl2RXU3amZFR3BER01QcGhBZGo0QkF0SkZMNkZQaWhpT0c0aGc3OUIifQ==",
+    "passkeys": [],
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-03-04T05:06:07.000Z"
+  }
+}

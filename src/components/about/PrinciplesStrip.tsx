@@ -23,7 +23,7 @@ const PRINCIPLES = [
   {
     n: '03',
     title: 'Honest by default.',
-    body: 'Plain-language answers, visible crypto choices, and recovery codes so you’re never locked out of your own life.',
+    body: 'Plain-language answers, visible crypto choices, and clear limits — like the fact that nobody can recover a forgotten master password.',
   },
 ];
 

@@ -1,15 +1,14 @@
 /**
  * SecurityTimeline — Watchtower §4. Vertical timeline of recent security
- * events, derived from real vault state where possible (latest password
- * update, TOTP enrollment, registered passkeys, this session's unlock)
- * plus static milestones. The 2px gradient line draws down on scroll into
- * view; nodes pop and rows fade+rise as the line "passes" them.
+ * events derived from real vault state (this session's unlock, the latest
+ * password update, a stored per-login 2FA code). No invented events.
+ * The 2px gradient line draws down on scroll into view; nodes pop and rows
+ * fade+rise as the line "passes" them.
  */
 
 import { motion } from 'framer-motion';
-import { FileDown, Fingerprint, KeyRound, Lock, Smartphone } from 'lucide-react';
+import { KeyRound, Lock, Smartphone } from 'lucide-react';
 import type { VaultEntry } from '@/lib/vault';
-import type { WrappedKeyBlob } from '@/lib/webauthn';
 
 const EXPO = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -39,21 +38,13 @@ function nowTime(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export default function SecurityTimeline({
-  entries,
-  passkeys,
-  hasRecoveryCodes,
-}: {
-  entries: VaultEntry[];
-  passkeys: WrappedKeyBlob[];
-  hasRecoveryCodes: boolean;
-}) {
+export default function SecurityTimeline({ entries }: { entries: VaultEntry[] }) {
   const events: TimelineEvent[] = [
     {
       id: 'unlock',
-      icon: Fingerprint,
+      icon: Lock,
       color: '#35F0A1',
-      title: 'Vault unlocked with passkey',
+      title: 'Vault unlocked in this browser',
       when: `Today ${nowTime()}`,
     },
   ];
@@ -79,34 +70,6 @@ export default function SecurityTimeline({
       when: relDay(totpEntry.updatedAt),
     });
   }
-
-  if (hasRecoveryCodes) {
-    events.push({
-      id: 'recovery',
-      icon: FileDown,
-      color: '#8B7CFF',
-      title: 'Recovery codes regenerated',
-      when: '1 week ago',
-    });
-  }
-
-  if (passkeys[0]) {
-    events.push({
-      id: `passkey-${passkeys[0].credentialId}`,
-      icon: Fingerprint,
-      color: '#8B7CFF',
-      title: `New passkey registered: “${passkeys[0].name}”`,
-      when: relDay(passkeys[0].createdAt),
-    });
-  }
-
-  events.push({
-    id: 'created',
-    icon: Lock,
-    color: '#35F0A1',
-    title: 'Vault created on this device',
-    when: '1 month ago',
-  });
 
   return (
     <section aria-label="Recent security events">

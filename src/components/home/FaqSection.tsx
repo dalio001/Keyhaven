@@ -20,19 +20,19 @@ const FAQS = [
   },
   {
     q: 'What if I forget my master password?',
-    a: "Your recovery codes (generated at setup) can restore access. Without them, no one can — that's the point of zero-knowledge. We recommend the printed Emergency Kit.",
+    a: "No one can recover it — not us, and not a backup code. Your vault key is derived only from your master password. Keep it somewhere safe; encrypted backups open with the password that was in use when you exported them.",
   },
   {
     q: 'How does Google Authenticator work here?',
-    a: 'At setup you scan a QR code; the app then generates a new 6-digit code every 30 seconds. Unlocking asks for it — even with your password, an attacker without your phone stays out.',
+    a: 'At setup you scan a QR code; your app then shows a new 6-digit code every 30 seconds, and KeyHaven asks for it after your master password. It is a check made by KeyHaven: it stops someone who only knows your password from unlocking in the app, but your vault is encrypted with the master password alone.',
   },
   {
-    q: 'What is a passkey?',
-    a: 'A modern replacement for passwords using your device\u2019s fingerprint, face, PIN, or a USB security key (WebAuthn). One touch unlocks your vault.',
+    q: 'Can I unlock with a passkey?',
+    a: 'Not right now. The earlier passkey design stored data that could open the vault without the passkey, so it was turned off and existing vaults are re-encrypted with a fresh key. It will return only with keys held by the authenticator itself.',
   },
   {
     q: 'Where is my vault stored?',
-    a: "Encrypted, in your browser's local storage on this device. Export an encrypted backup file anytime and import it elsewhere.",
+    a: "Encrypted, in your browser's IndexedDB storage on this device. Export an encrypted backup file anytime and import it elsewhere.",
   },
   {
     q: 'Is it really free?',

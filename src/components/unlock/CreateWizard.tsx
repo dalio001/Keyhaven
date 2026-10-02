@@ -1,19 +1,21 @@
 /**
- * CreateWizard — Mode B of the vault gate (design/unlock.md): the 4-step
+ * CreateWizard — Mode B of the vault gate (design/unlock.md): the 3-step
  * Create Vault wizard.
  *   1. Master password — zxcvbn StrengthMeter, passphrase generator,
- *      zero-knowledge warning. Continuing derives the key and creates the
- *      (empty-entries + sample-seeded) encrypted vault locally.
- *   2. Second lock — TOTP enrollment: real otpauth:// QR (qrcode.react)
- *      from useVault().beginTotpEnrollment(), manual base32 entry, 6-digit
+ *      no-recovery warning. Continuing derives the key and creates the
+ *      (empty-entries + sample-seeded) encrypted vault locally. Creation
+ *      never overwrites an existing vault.
+ *   2. Authenticator (optional extra check by the app) — TOTP enrollment:
+ *      real otpauth:// QR (qrcode.react), manual base32 entry, 6-digit
  *      confirm via confirmTotpEnrollment(). Skippable.
- *   3. Passkey — WebAuthn registration via addPasskey(). Skippable.
- *   4. Recovery codes — masked grid with scramble reveal, download .txt,
- *      printable emergency kit, copy-all; required saved-checkbox arms the
- *      aurora "Seal my vault" button → parent success ceremony.
+ *   3. Safety — authenticator backup codes (only when the authenticator was
+ *      enabled): masked grid, download .txt, printable kit, copy-all; plus a
+ *      required acknowledgement that a forgotten master password cannot be
+ *      recovered → "Seal my vault" → parent success ceremony.
+ * (Passkey registration was removed in Phase 1 — see docs/security-model.md.)
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -25,6 +27,7 @@ import {
   FileDown,
   KeyRound,
   Loader2,
+  Lock,
   Printer,
   QrCode,
   ShieldCheck,
@@ -43,7 +46,6 @@ import {
 } from '@/components/ui/dialog';
 import LiveScramble from '@/components/LiveScramble';
 import OtpInput from '@/components/unlock/OtpInput';
-import PasskeyPanel from '@/components/unlock/PasskeyPanel';
 import StrengthMeter from '@/components/unlock/StrengthMeter';
 import { generatePassword } from '@/lib/crypto';
 import { useVault } from '@/providers/VaultProvider';
@@ -59,8 +61,14 @@ export interface CreateWizardProps {
   onBackToUnlock: () => void;
   /** report the current step (parent fills the backdrop ring per quarter) */
   onStepChange: (step: number) => void;
-  /** the wizard created + unlocked the vault (parent must not auto-redirect) */
+  /**
+   * the wizard is creating (and unlocking) the vault — called BEFORE creation
+   * starts, because the vault becomes unlocked before createVault() resolves
+   * and the parent must not auto-redirect mid-wizard
+   */
   onVaultCreated: () => void;
+  /** creation failed (e.g. a vault already exists): undo onVaultCreated */
+  onVaultCreateFailed?: () => void;
   /** a vault already exists on this device → edge banner */
   hasVault: boolean;
   onSwitchToUnlock: () => void;
@@ -71,6 +79,7 @@ export default function CreateWizard({
   onBackToUnlock,
   onStepChange,
   onVaultCreated,
+  onVaultCreateFailed,
   hasVault,
   onSwitchToUnlock,
 }: CreateWizardProps) {
@@ -79,9 +88,12 @@ export default function CreateWizard({
     beginTotpEnrollment,
     confirmTotpEnrollment,
     cancelTotpEnrollment,
-    recoveryCodes,
+    backupCodes,
     copyWithAutoClear,
     destroyVault,
+    status,
+    lockReason,
+    holdAutoLock,
   } = useVault();
 
   const [step, setStep] = useState(1);
@@ -109,21 +121,28 @@ export default function CreateWizard({
   const [totpError, setTotpError] = useState<string | null>(null);
   const [totpShake, setTotpShake] = useState(0);
   const [enrolled, setEnrolled] = useState(false);
+  const [enrollSaveWarning, setEnrollSaveWarning] = useState(false);
   const [manual, setManual] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
 
-  /* step 3 — passkey */
-  const [passkeyDone, setPasskeyDone] = useState(false);
-
-  /* step 4 — recovery codes */
+  /* step 3 — backup codes + no-recovery acknowledgement */
+  const [vaultCreated, setVaultCreated] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [printBlocked, setPrintBlocked] = useState(false);
 
+  // once the vault exists the user is often away from the keyboard (scanning
+  // the QR code, writing down backup codes) — don't idle-lock mid-setup
+  useEffect(() => (vaultCreated ? holdAutoLock() : undefined), [vaultCreated, holdAutoLock]);
+  // it can still lock (another tab unlocked it, storage was replaced…):
+  // say so instead of rejecting codes against a dropped enrollment
+  const lockedMidSetup = vaultCreated && status !== 'unlocked';
+
   const pwScore = useMemo(() => (password ? zxcvbn(password).score : 0), [password]);
   const mismatch = confirm.length > 0 && confirm !== password;
-  const canContinue1 = password.length > 0 && pwScore >= 3 && password === confirm && !creating;
+  const canContinue1 =
+    password.length > 0 && pwScore >= 3 && password === confirm && !creating && !hasVault && !vaultCreated;
 
   const goTo = (n: number) => {
     dirRef.current = n > step ? 1 : -1;
@@ -146,18 +165,24 @@ export default function CreateWizard({
     setCreateError(null);
     try {
       // derive the key + write the encrypted vault record right away, so the
-      // remaining wizard steps (TOTP, passkey, recovery codes) operate on it.
-      await createVault(password, { seedSample: true });
+      // remaining wizard steps (authenticator, backup codes) operate on it.
+      // createVault never overwrites an existing vault.
       onVaultCreated();
+      await createVault(password, { seedSample: true });
+      setVaultCreated(true);
       goTo(2);
-    } catch {
-      setCreateError('Could not create the vault on this device — please try again.');
+    } catch (err) {
+      onVaultCreateFailed?.();
+      setCreateError(err instanceof Error ? err.message : 'Could not create the vault on this device — please try again.');
     }
     setCreating(false);
   };
 
   /* ---------------- step 2 ---------------- */
   const chooseTotp = (c: 'app' | 'skip') => {
+    // once a code was accepted the authenticator is on (it can be turned off
+    // later in Settings with a code) — "Skip" would not undo it, so lock the choice
+    if (enrolled) return;
     setTotpChoice(c);
     setTotpError(null);
     if (c === 'app') {
@@ -174,10 +199,16 @@ export default function CreateWizard({
     if (totpBusy || enrolled) return;
     setTotpBusy(true);
     setTotpError(null);
-    const ok = await confirmTotpEnrollment(code);
+    const result = await confirmTotpEnrollment(code);
     setTotpBusy(false);
-    if (ok) {
+    if (result === 'ok' || result === 'save-failed') {
+      // 'save-failed': the code was accepted and the authenticator is already
+      // enabled in memory; the save is being retried — so it IS enrolled and the
+      // backup codes must be shown in the next step
       setEnrolled(true);
+      setEnrollSaveWarning(result === 'save-failed');
+    } else if (result === 'locked') {
+      setTotpCode(''); // the locked-mid-setup panel explains what happened
     } else {
       setTotpShake((k) => k + 1);
       setTotpCode('');
@@ -192,26 +223,28 @@ export default function CreateWizard({
     setTimeout(() => setCopiedSecret(false), 2000);
   };
 
-  /* ---------------- step 4 ---------------- */
-  const codes = recoveryCodes;
+  /* ---------------- step 3 ---------------- */
+  const codes = backupCodes;
 
   const downloadTxt = () => {
     const text = [
-      'KeyHaven — Recovery Codes',
+      'KeyHaven — Authenticator backup codes',
       `Generated: ${new Date().toLocaleString()}`,
       '',
-      'Each code is a one-time safety net for your vault.',
-      'Store them somewhere offline. Anyone holding a code should be treated as you.',
+      'Each code can be used ONCE instead of the 6-digit authenticator code,',
+      'for example if you lose your phone. Your master password is still required.',
+      'These codes CANNOT recover a forgotten master password.',
+      'Store them offline, away from your master password.',
       '',
       ...codes.map((c, i) => `${String(i + 1).padStart(2, '0')}.  ${c}`),
       '',
-      'KeyHaven is zero-knowledge — your passwords never leave your device.',
+      'KeyHaven is local-first — your vault is encrypted in this browser.',
     ].join('\n');
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'keyhaven-recovery-codes.txt';
+    a.download = 'keyhaven-backup-codes.txt';
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -230,13 +263,13 @@ export default function CreateWizard({
       )
       .join('');
     win.document.write(`<!doctype html>
-<html><head><title>KeyHaven Emergency Kit</title></head>
+<html><head><title>KeyHaven backup codes</title></head>
 <body style="font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#111;padding:40px;max-width:640px;margin:0 auto;">
-  <h1 style="font-size:22px;margin:0 0 4px;">KeyHaven Emergency Kit</h1>
+  <h1 style="font-size:22px;margin:0 0 4px;">KeyHaven — authenticator backup codes</h1>
   <p style="color:#555;font-size:13px;margin:0 0 24px;">Printed ${new Date().toLocaleString()} · Store this sheet somewhere safe and offline.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${rows}</div>
   <p style="margin-top:28px;font-size:13px;color:#333;">Master password hint: <span style="display:inline-block;min-width:280px;border-bottom:1px solid #999;">&nbsp;</span></p>
-  <p style="margin-top:20px;font-size:12px;color:#777;">Each code is one-time use. KeyHaven cannot recover your vault for you — these codes are your safety net.</p>
+  <p style="margin-top:20px;font-size:12px;color:#777;">Each code works once, instead of the 6-digit authenticator code. Your master password is still required — these codes cannot recover a forgotten master password, and KeyHaven cannot either.</p>
 </body></html>`);
     win.document.close();
     win.focus();
@@ -244,7 +277,7 @@ export default function CreateWizard({
   };
 
   const copyAll = async () => {
-    await copyWithAutoClear(codes.join('\n'), 'Recovery codes');
+    await copyWithAutoClear(codes.join('\n'), 'Backup codes');
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
   };
@@ -301,17 +334,19 @@ export default function CreateWizard({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => (step > 1 ? goTo(step - 1) : onBackToUnlock())}
+          onClick={() => (step > 2 ? goTo(step - 1) : step === 1 ? onBackToUnlock() : undefined)}
+          disabled={step === 2}
+          title={step === 2 ? 'Your vault is already created — change the master password later in Settings' : undefined}
           aria-label="Back"
           className="flex h-8 w-8 items-center justify-center rounded-full border border-kh-line text-kh-muted transition-colors hover:border-kh-lineStrong hover:text-kh-primary"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-kh-faint">
-          Step {step} of 4
+          Step {step} of 3
         </span>
         <div className="ml-auto flex gap-1">
-          {[1, 2, 3, 4].map((n) => (
+          {[1, 2, 3].map((n) => (
             <div key={n} className="h-1 w-8 overflow-hidden rounded-full bg-kh-inset">
               <motion.div
                 className="h-full w-full origin-left rounded-full bg-kh-mint"
@@ -436,8 +471,8 @@ export default function CreateWizard({
                     >
                       <p className="flex items-start gap-2 rounded-xl border border-kh-warning/40 bg-kh-warning/10 p-3.5 text-sm leading-[22px] text-kh-warning">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        If you forget this and lose your recovery codes, no one
-                        — not even us — can open your vault. Write it down.
+                        If you forget this, no one — not even us — can open your
+                        vault. There is no recovery. Write it down somewhere safe.
                       </p>
                     </motion.div>
                   )}
@@ -477,15 +512,49 @@ export default function CreateWizard({
             )}
 
             {/* ---------------- STEP 2 — TOTP ---------------- */}
-            {step === 2 && (
+            {lockedMidSetup && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h3 className="flex items-center gap-2 font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">
+                    <Lock className="h-5 w-5 text-kh-warning" /> KeyHaven locked during setup.
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-[22px] text-kh-muted">
+                    {lockReason === 'other-tab'
+                      ? 'It was unlocked in another tab, so this one locked. '
+                      : 'This tab locked before setup finished. '}
+                    Your vault is created and saved with your master password — unlock it to continue.
+                    {enrolled
+                      ? ' Your authenticator is on; you can view or replace its backup codes in Settings → Security methods.'
+                      : ' You can turn on the authenticator in Settings → Security methods.'}
+                  </p>
+                  {totpChoice === 'app' && !enrolled && (
+                    <p className="mt-2 text-sm leading-[22px] text-kh-muted">
+                      If you already added a KeyHaven entry to your authenticator app in this step,
+                      delete it — it was never turned on, so its codes won't work.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onSwitchToUnlock}
+                  className="bg-aurora flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-[#04110B] transition-all duration-200 hover:-translate-y-px hover:shadow-glow active:scale-[0.97]"
+                >
+                  Unlock vault
+                </button>
+              </div>
+            )}
+
+            {step === 2 && !lockedMidSetup && (
               <div className="flex flex-col gap-4">
                 <div>
                   <h3 className="font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">
-                    Add your second lock.
+                    Add an authenticator check.
                   </h3>
                   <p className="mt-1.5 text-sm leading-[22px] text-kh-muted">
-                    Even if someone guesses your master password, your phone
-                    keeps them out.
+                    After your master password, KeyHaven will also ask for a
+                    6-digit code from your phone. It's an extra check by this
+                    app — your vault is encrypted with your master password, so
+                    keep that strong.
                   </p>
                 </div>
 
@@ -536,6 +605,8 @@ export default function CreateWizard({
                     type="button"
                     role="radio"
                     aria-checked={totpChoice === 'skip'}
+                    disabled={enrolled}
+                    title={enrolled ? 'The authenticator is already on — turn it off later in Settings if needed' : undefined}
                     onClick={() => chooseTotp('skip')}
                     className={cn(
                       'flex items-start gap-3 rounded-xl border p-4 text-left transition-colors duration-200',
@@ -634,7 +705,11 @@ export default function CreateWizard({
                         </AnimatePresence>
 
                         <div className="flex flex-col items-start gap-2 self-start">
+                          <label htmlFor="kh-enroll-code" className="text-sm font-medium text-kh-primary">
+                            Enter the 6-digit code from your app
+                          </label>
                           <OtpInput
+                            id="kh-enroll-code"
                             value={totpCode}
                             onChange={(v) => {
                               setTotpCode(v);
@@ -662,8 +737,14 @@ export default function CreateWizard({
                               animate={{ opacity: 1, y: 0 }}
                               className="flex items-center gap-1.5 text-sm font-medium text-kh-mint"
                             >
-                              <ShieldCheck className="h-4 w-4" /> Second lock armed.
+                              <ShieldCheck className="h-4 w-4" /> Authenticator enabled.
                             </motion.p>
+                          )}
+                          {enrolled && enrollSaveWarning && (
+                            <p className="text-sm text-kh-warning" role="status">
+                              This browser hasn't saved it yet — KeyHaven keeps retrying. Check the save status
+                              before closing this tab.
+                            </p>
                           )}
                         </div>
                       </div>
@@ -686,56 +767,32 @@ export default function CreateWizard({
               </div>
             )}
 
-            {/* ---------------- STEP 3 — passkey ---------------- */}
-            {step === 3 && (
+            {/* ---------------- STEP 3 — safety: backup codes + no recovery ---------------- */}
+            {step === 3 && !lockedMidSetup && (
               <div className="flex flex-col gap-4">
                 <div>
                   <h3 className="font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">
-                    Unlock with a touch.
+                    Before you seal it.
                   </h3>
                   <p className="mt-1.5 text-sm leading-[22px] text-kh-muted">
-                    Register this device's fingerprint/face or a USB security
-                    key so you can skip typing entirely.
+                    Your master password is the only way to decrypt this vault.
+                    KeyHaven cannot reset or recover it. Keep a copy somewhere
+                    safe, and export encrypted backups from Settings.
                   </p>
                 </div>
 
-                <PasskeyPanel
-                  mode="register"
-                  onRegistered={() => setPasskeyDone(true)}
-                  onSkip={() => goTo(4)}
-                />
-
-                {passkeyDone && (
-                  <motion.button
-                    type="button"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    onClick={() => goTo(4)}
-                    className="bg-aurora flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-[#04110B] transition-all duration-200 hover:-translate-y-px hover:shadow-glow active:scale-[0.97]"
-                  >
-                    Continue
-                  </motion.button>
-                )}
-              </div>
-            )}
-
-            {/* ---------------- STEP 4 — recovery codes ---------------- */}
-            {step === 4 && (
-              <div className="flex flex-col gap-4">
-                <div>
-                  <h3 className="font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">
-                    Your safety net.
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-[22px] text-kh-muted">
-                    {codes.length} one-time codes. Each can unlock your vault if
-                    you lose your phone or forget your password. Store them
-                    somewhere offline.
-                  </p>
-                </div>
+                {enrolled && (
+                <>
+                <p className="text-sm leading-[22px] text-kh-muted">
+                  <span className="font-medium text-kh-primary">Authenticator backup codes.</span>{' '}
+                  {codes.length} one-time codes — each can replace the 6-digit
+                  code once if you lose your phone. They still require your
+                  master password and cannot recover it.
+                </p>
 
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-kh-faint">
-                    Recovery codes
+                    Backup codes
                   </span>
                   <button
                     type="button"
@@ -756,7 +813,7 @@ export default function CreateWizard({
                       {revealed ? (
                         <LiveScramble text={code} speed={14} className="text-kh-primary" />
                       ) : (
-                        <span className="text-kh-faint" aria-label="Masked recovery code">
+                        <span className="text-kh-faint" aria-label="Masked backup code">
                           {mask}
                         </span>
                       )}
@@ -777,7 +834,7 @@ export default function CreateWizard({
                     onClick={printKit}
                     className="flex items-center gap-1.5 rounded-full border border-kh-lineStrong px-3.5 py-2 text-xs font-semibold text-kh-primary transition-colors hover:bg-kh-elevated"
                   >
-                    <Printer className="h-3.5 w-3.5" /> Print Emergency Kit
+                    <Printer className="h-3.5 w-3.5" /> Print codes
                   </button>
                   <button
                     type="button"
@@ -793,6 +850,8 @@ export default function CreateWizard({
                     Your browser blocked the print window — allow pop-ups for this page and try again.
                   </p>
                 )}
+                </>
+                )}
 
                 <div className="flex items-start gap-2.5">
                   <Checkbox
@@ -802,7 +861,9 @@ export default function CreateWizard({
                     className="mt-0.5 border-kh-lineStrong"
                   />
                   <label htmlFor="kh-saved" className="cursor-pointer select-none text-sm leading-[22px] text-kh-muted">
-                    I've saved my recovery codes somewhere safe
+                    {enrolled
+                      ? "I've saved my backup codes, and I understand KeyHaven cannot recover a forgotten master password."
+                      : 'I understand KeyHaven cannot recover a forgotten master password.'}
                   </label>
                 </div>
 

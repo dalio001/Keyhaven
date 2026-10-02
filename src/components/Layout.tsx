@@ -11,6 +11,7 @@
 import { Outlet } from 'react-router';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import VaultNotices from './VaultNotices';
 
 export default function Layout() {
   return (
@@ -20,6 +21,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <Footer />
+      <VaultNotices />
     </div>
   );
 }

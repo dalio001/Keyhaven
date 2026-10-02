@@ -1,11 +1,11 @@
 /**
  * /unlock — the vault gate (design/unlock.md). Dual mode:
- *   Mode A (default)     — Unlock: master password / passkey / TOTP.
- *   Mode B (?mode=create) — Create Vault wizard (4 steps).
+ *   Mode A (default)     — Unlock: master password (+ authenticator code or backup code).
+ *   Mode B (?mode=create) — Create Vault wizard (3 steps).
  *
  * Shell owns: the full-bleed unlock-vault.png backdrop (dimmed 40%, 2px
  * blur, Ken Burns drift), the center-stage 340px VaultRing whose mint arc
- * fills one quarter per wizard step, the glass card with AnimatePresence
+ * fills one third per wizard step, the glass card with AnimatePresence
  * cross-slide transitions, the success ceremony (dash sweep → lock flip →
  * iris-open → /vault), failed-attempt danger flashes, and the route guards
  * (already-unlocked → /vault; no-vault → create prompt).
@@ -14,13 +14,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { AnimatePresence, animate, motion } from 'framer-motion';
-import { Check, Loader2, Lock, Unlock as UnlockIcon } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, Lock, RefreshCw, Unlock as UnlockIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import CursorRing from '@/components/CursorRing';
 import VaultRing from '@/components/VaultRing';
 import UnlockMode from '@/components/unlock/UnlockMode';
 import CreateWizard from '@/components/unlock/CreateWizard';
+import RestoreBackupPanel from '@/components/unlock/RestoreBackupPanel';
 import { useVault } from '@/providers/VaultProvider';
 import { cn } from '@/lib/utils';
 
@@ -94,7 +95,9 @@ function CeremonyPanel({ kind }: { kind: 'unlock' | 'create' }) {
 }
 
 export default function Unlock() {
-  const { status, hasVault } = useVault();
+  const { status, hasVault, unavailableReason, unavailableDetail, retryStorage, destroyVault } = useVault();
+  const [showRestore, setShowRestore] = useState(false);
+  const [confirmWipe, setConfirmWipe] = useState('');
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const mode: 'unlock' | 'create' = params.get('mode') === 'create' ? 'create' : 'unlock';
@@ -120,10 +123,10 @@ export default function Unlock() {
     }
   }, [status, ceremony, navigate]);
 
-  /* ring fills one quarter per completed wizard step */
+  /* ring fills one third per completed wizard step */
   useEffect(() => {
     if (ceremony) return;
-    const v = mode === 'create' ? (wizardStep - 1) / 4 : 0;
+    const v = mode === 'create' ? (wizardStep - 1) / 3 : 0;
     ringProgressRef.current = v;
     setRingProgress(v);
   }, [mode, wizardStep, ceremony]);
@@ -177,7 +180,9 @@ export default function Unlock() {
     ? `ceremony-${ceremony}`
     : status === 'loading'
       ? 'loading'
-      : mode === 'unlock'
+      : status === 'unavailable'
+        ? 'unavailable'
+        : mode === 'unlock'
         ? hasVault
           ? 'unlock'
           : 'no-vault'
@@ -282,6 +287,81 @@ export default function Unlock() {
                   >
                     Create your vault
                   </button>
+                  {showRestore ? (
+                    <RestoreBackupPanel />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowRestore(true)}
+                      className="text-sm text-kh-muted underline-offset-4 transition-colors hover:text-kh-primary hover:underline"
+                    >
+                      Restore from an encrypted backup instead
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {contentKey === 'unavailable' && (
+                <div className="flex flex-col items-center gap-4 py-4 text-center">
+                  <VaultRing size={64}>
+                    <AlertTriangle className="h-6 w-6 text-kh-warning" />
+                  </VaultRing>
+                  <h3 className="font-display text-xl font-semibold text-kh-primary">
+                    {unavailableReason === 'invalid-record'
+                      ? "The stored vault can't be read."
+                      : unavailableReason === 'unsupported-version'
+                        ? 'This vault needs a newer KeyHaven.'
+                        : unavailableReason === 'blocked'
+                          ? 'Close other KeyHaven tabs.'
+                          : unavailableReason === 'superseded'
+                            ? 'KeyHaven was updated in another tab.'
+                            : "This browser's storage isn't available."}
+                  </h3>
+                  <p className="text-sm leading-[22px] text-kh-muted">
+                    {unavailableReason === 'invalid-record'
+                      ? 'The vault data in this browser is damaged or not a KeyHaven vault. Nothing was changed. You can restore an encrypted backup (the unreadable data is kept as the previous vault) or delete it.'
+                      : unavailableReason === 'unsupported-version'
+                        ? 'It was saved by a newer version of KeyHaven. Update KeyHaven to open it — it has not been changed.'
+                        : unavailableReason === 'blocked'
+                          ? 'A KeyHaven tab opened before this update is still using the vault storage. Close it so the storage can be upgraded — nothing has been changed.'
+                          : unavailableReason === 'superseded'
+                            ? 'A newer version of KeyHaven now owns this browser’s vault storage. Reload this page to continue.'
+                            : 'KeyHaven could not open its storage (private browsing or blocked site data can cause this). Nothing was changed.'}
+                  </p>
+                  {unavailableDetail && (
+                    <p className="font-mono text-[11px] leading-4 text-kh-faint">{unavailableDetail}</p>
+                  )}
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => (unavailableReason === 'superseded' ? window.location.reload() : void retryStorage())}
+                      className="flex items-center gap-1.5 rounded-full border border-kh-lineStrong px-4 py-2 text-sm font-medium text-kh-primary hover:bg-kh-elevated"
+                    >
+                      <RefreshCw className="h-4 w-4" /> {unavailableReason === 'superseded' ? 'Reload' : 'Try again'}
+                    </button>
+                  </div>
+                  {unavailableReason === 'invalid-record' && (
+                    <>
+                      <RestoreBackupPanel />
+                      <div className="flex w-full gap-2">
+                        <input
+                          value={confirmWipe}
+                          onChange={(e) => setConfirmWipe(e.target.value)}
+                          placeholder="Type DELETE to wipe it"
+                          aria-label="Type DELETE to delete the unreadable vault"
+                          className="h-10 flex-1 rounded-md border border-kh-danger/40 bg-kh-inset px-3 font-mono text-sm text-kh-danger placeholder:text-kh-faint"
+                        />
+                        <button
+                          type="button"
+                          disabled={confirmWipe !== 'DELETE'}
+                          onClick={() => void destroyVault().then(() => setConfirmWipe(''))}
+                          className="rounded-md border border-kh-danger/50 px-3 text-sm font-semibold text-kh-danger disabled:opacity-40"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -300,6 +380,9 @@ export default function Unlock() {
                   onStepChange={setWizardStep}
                   onVaultCreated={() => {
                     createdHereRef.current = true;
+                  }}
+                  onVaultCreateFailed={() => {
+                    createdHereRef.current = false;
                   }}
                   hasVault={hasVault && !createdHereRef.current}
                   onSwitchToUnlock={() => switchMode('unlock')}

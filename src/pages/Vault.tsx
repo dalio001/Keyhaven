@@ -79,7 +79,23 @@ interface FormState {
 }
 
 function VaultDashboard() {
-  const { entries, addEntry, updateEntry, removeEntry } = useVault();
+  const { entries, addEntry, updateEntry, removeEntry, flush } = useVault();
+
+  /** Toast only once the change is actually saved (encrypted) in this browser. */
+  const toastWhenSaved = useCallback(
+    (title: string) => {
+      flush().then(
+        () => showVaultToast({ title, variant: 'success' }),
+        () =>
+          showVaultToast({
+            title: "Not saved to this browser yet — KeyHaven is retrying. Don't close this tab.",
+            variant: 'danger',
+            durationMs: 6000,
+          }),
+      );
+    },
+    [flush],
+  );
 
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [statFilter, setStatFilter] = useState<StatFilter>(null);
@@ -179,7 +195,10 @@ function VaultDashboard() {
 
   const handleDelete = useCallback(
     (e: VaultEntry) => {
-      removeEntry(e.id);
+      if (!removeEntry(e.id)) {
+        showVaultToast({ title: 'The vault is locked or out of date — nothing was deleted.', variant: 'danger' });
+        return;
+      }
       setDetailId((id) => (id === e.id ? null : id));
       setForm((f) => (f.entry?.id === e.id ? { ...f, open: false } : f));
       const snapshot = { ...(e as EntryExt) };
@@ -190,8 +209,11 @@ function VaultDashboard() {
         actionLabel: 'Undo',
         durationMs: 5000,
         onAction: () => {
-          addEntry(snapshot as NewEntryDraft);
-          showVaultToast({ title: `${e.title} restored`, variant: 'success', durationMs: 2500 });
+          if (addEntry(snapshot as NewEntryDraft)) {
+            showVaultToast({ title: `${e.title} restored`, variant: 'success', durationMs: 2500 });
+          } else {
+            showVaultToast({ title: `Couldn't restore ${e.title} — the vault is locked.`, variant: 'danger' });
+          }
         },
       });
     },
@@ -212,6 +234,7 @@ function VaultDashboard() {
         totp: e.totp,
         ...(ext.totpSecret ? { totpSecret: ext.totpSecret } : {}),
       } as NewEntryDraft);
+      if (!copy) return;
       setNewId(copy.id);
       showVaultToast({ title: `${e.title} duplicated`, variant: 'success', durationMs: 2500 });
     },
@@ -230,23 +253,31 @@ function VaultDashboard() {
                 ...((prev as EntryExt).passwordHistory ?? []),
               ].slice(0, 10)
             : (prev as EntryExt).passwordHistory;
-        updateEntry(prev.id, {
+        const applied = updateEntry(prev.id, {
           ...base,
           ...(history ? { passwordHistory: history } : {}),
           totpSecret: draft.totp ? totpSecret : undefined,
         } as Partial<VaultEntry>);
-        showVaultToast({ title: 'Login updated — encrypted locally.', variant: 'success' });
+        if (!applied) {
+          showVaultToast({ title: 'The vault is locked or out of date — the change was not applied.', variant: 'danger' });
+          return;
+        }
+        toastWhenSaved('Login updated — encrypted and saved locally.');
       } else {
         const created = addEntry({
           ...base,
           ...(draft.totp && totpSecret ? { totpSecret } : {}),
         } as NewEntryDraft);
+        if (!created) {
+          showVaultToast({ title: 'The vault is locked or out of date — the login was not added.', variant: 'danger' });
+          return;
+        }
         setNewId(created.id);
-        showVaultToast({ title: 'Login saved — encrypted locally.', variant: 'success' });
+        toastWhenSaved('Login saved — encrypted and saved locally.');
       }
       setForm((f) => ({ ...f, open: false }));
     },
-    [form.mode, form.entry, addEntry, updateEntry],
+    [form.mode, form.entry, addEntry, updateEntry, toastWhenSaved],
   );
 
   const clearAllFilters = useCallback(() => {

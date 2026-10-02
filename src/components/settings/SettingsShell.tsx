@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
 import { useVault } from '@/providers/VaultProvider';
+import SaveStatus from '@/components/SaveStatus';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -142,10 +143,7 @@ function Topbar() {
       </button>
 
       <div className="flex items-center gap-3">
-        <span className="hidden items-center gap-2 rounded-full border border-kh-line bg-kh-surface px-3 py-1.5 text-xs text-kh-muted sm:flex">
-          <span className="h-1.5 w-1.5 animate-dot-pulse rounded-full bg-kh-mint" />
-          Encrypted · local
-        </span>
+        <SaveStatus className="hidden sm:flex" />
         {lockCountdown !== null && (
           <span className="hidden font-mono text-xs text-kh-faint lg:block">
             {formatCountdown(lockCountdown)}

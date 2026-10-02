@@ -20,8 +20,8 @@ const STEPS = [
   {
     n: '02',
     icon: <QrCode className="h-5 w-5 text-kh-cyan" />,
-    title: 'Add your second lock',
-    body: 'Scan a QR with Google Authenticator, or register a passkey — face, finger, or hardware key.',
+    title: 'Add an authenticator (optional)',
+    body: 'Scan a QR with Google Authenticator for an extra 6-digit check every time you unlock.',
   },
   {
     n: '03',

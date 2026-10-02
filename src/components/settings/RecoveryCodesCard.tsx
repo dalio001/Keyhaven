@@ -1,8 +1,11 @@
 /**
- * Settings → Security methods → Recovery codes card.
+ * Settings → Security methods → Authenticator backup codes card.
+ * One-time codes that replace the 6-digit authenticator code at unlock (e.g.
+ * after losing the phone). The master password is ALWAYS still required:
+ * these codes cannot recover a forgotten master password.
  * Masked mono grid (auto-remasks on the vault remask timer), reveal-all with
- * a mini-scramble per code, Download .txt, Print Emergency Kit, and
- * Regenerate behind an amber confirm (old codes stop working immediately).
+ * a mini-scramble per code, Download .txt, Print, and Regenerate behind an
+ * amber confirm (old codes stop working once the new ones are saved).
  */
 
 import { useEffect, useState } from 'react';
@@ -19,44 +22,34 @@ import {
 } from '@/components/ui/dialog';
 import LiveScramble from '@/components/LiveScramble';
 import { useVault } from '@/providers/VaultProvider';
+import { downloadTextFile } from '@/lib/download';
 import { EASE, KhButton, SectionCard, StatusChip } from './ui';
 
 const MASKED = '••••-••••-••••';
 
-function downloadTextFile(filename: string, text: string) {
-  const blob = new Blob([text], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function emergencyKitText(codes: string[]): string {
+function backupCodesText(codes: string[]): string {
   const stamp = new Date().toISOString().slice(0, 10);
   return [
-    'KEYHAVEN — EMERGENCY KIT',
+    'KEYHAVEN — AUTHENTICATOR BACKUP CODES',
     `Printed: ${stamp}`,
     '',
-    'Keep this page somewhere physical and safe. Anyone holding it can',
-    'recover your vault — treat it like cash or a passport.',
+    'Each code works ONCE instead of the 6-digit authenticator code, e.g. if',
+    'you lose your phone. Your master password is still required.',
+    'These codes CANNOT recover a forgotten master password — nothing can.',
+    'Keep them offline and away from your master password.',
     '',
-    'RECOVERY CODES (each works once):',
+    'BACKUP CODES (each works once):',
     ...codes.map((c, i) => `  ${String(i + 1).padStart(2, ' ')}. ${c}`),
     '',
-    'MASTER PASSWORD HINT (optional, write by hand):',
-    '  ______________________________________________',
+    'How to use: KeyHaven → Unlock → enter your master password →',
+    '"Lost your phone? Use a backup code" → enter one code above.',
     '',
-    'How to recover: open KeyHaven → Unlock → "Use a recovery code" →',
-    'enter one code above, then set a new master password.',
-    '',
-    'keyhaven.local — zero-knowledge, local-first. We can’t see this page.',
+    'KeyHaven is local-first: your vault is encrypted in your browser.',
   ].join('\n');
 }
 
 export default function RecoveryCodesCard() {
-  const { recoveryCodes, regenerateRecoveryCodes, settings } = useVault();
+  const { backupCodes: recoveryCodes, regenerateBackupCodes, settings, totpEnabled } = useVault();
   const [revealed, setRevealed] = useState(false);
   const [regenOpen, setRegenOpen] = useState(false);
 
@@ -70,8 +63,8 @@ export default function RecoveryCodesCard() {
   const stamp = new Date().toISOString().slice(0, 10);
 
   const downloadTxt = () => {
-    downloadTextFile(`keyhaven-recovery-codes-${stamp}.txt`, emergencyKitText(recoveryCodes));
-    toast.success('Recovery codes downloaded — store the file offline');
+    downloadTextFile(`keyhaven-backup-codes-${stamp}.txt`, backupCodesText(recoveryCodes));
+    toast.success('Backup codes file created — store it offline');
   };
 
   const printKit = () => {
@@ -89,35 +82,41 @@ export default function RecoveryCodesCard() {
           </div>`,
       )
       .join('');
-    w.document.write(`<!doctype html><html><head><title>KeyHaven Emergency Kit</title></head>
+    w.document.write(`<!doctype html><html><head><title>KeyHaven backup codes</title></head>
       <body style="font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;color:#111;padding:0 24px">
-        <h1 style="font-size:22px;margin-bottom:4px">KeyHaven — Emergency Kit</h1>
-        <p style="color:#555;font-size:13px;margin-top:0">Printed ${stamp} · Keep this page somewhere physical and safe.
-        Anyone holding it can recover your vault — treat it like cash or a passport.</p>
-        <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:2px;margin-top:28px">Recovery codes (each works once)</h2>
+        <h1 style="font-size:22px;margin-bottom:4px">KeyHaven — authenticator backup codes</h1>
+        <p style="color:#555;font-size:13px;margin-top:0">Printed ${stamp} · Keep this page offline and away from your master password.
+        Each code works once instead of the 6-digit authenticator code. Your master password is still required —
+        these codes cannot recover a forgotten master password.</p>
+        <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:2px;margin-top:28px">Backup codes (each works once)</h2>
         ${rows}
-        <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:2px;margin-top:28px">Master password hint (optional)</h2>
-        <div style="border-bottom:2px solid #999;height:36px"></div>
-        <p style="color:#555;font-size:13px;margin-top:28px">How to recover: open KeyHaven → Unlock → “Use a recovery code” →
-        enter one code above, then set a new master password.</p>
-        <p style="color:#999;font-size:11px;margin-top:32px">keyhaven.local — zero-knowledge, local-first. We can’t see this page.</p>
+        <p style="color:#555;font-size:13px;margin-top:28px">How to use: KeyHaven → Unlock → enter your master password →
+        “Lost your phone? Use a backup code” → enter one code above.</p>
         <script>window.print()</script>
       </body></html>`);
     w.document.close();
   };
 
-  const regenerate = () => {
-    regenerateRecoveryCodes();
+  const regenerate = async () => {
     setRegenOpen(false);
-    setRevealed(true);
-    toast.success('New recovery codes generated — old codes stopped working');
+    try {
+      await regenerateBackupCodes();
+      setRevealed(true);
+      toast.success('New backup codes saved — the old ones no longer work');
+    } catch {
+      toast.error("New codes couldn't be saved yet — the old codes still work until they are");
+    }
   };
 
   return (
     <SectionCard
       id="recovery"
-      title="Recovery codes"
-      helper="One-time codes that unlock your vault if you lose your phone or forget your master password. Store them offline — they’re as powerful as your password."
+      title="Authenticator backup codes"
+      helper={
+        totpEnabled
+          ? 'One-time codes that replace the 6-digit authenticator code if you lose your phone. Your master password is still required — they cannot recover it. Store them offline.'
+          : 'These one-time codes only matter when the authenticator is turned on: they replace its 6-digit code. They never replace or recover your master password.'
+      }
       headerAction={<StatusChip tone="faint">{recoveryCodes.length} codes</StatusChip>}
     >
       {/* grid */}
@@ -152,7 +151,7 @@ export default function RecoveryCodesCard() {
           <FileDown className="h-4 w-4" /> Download .txt
         </KhButton>
         <KhButton variant="ghost" onClick={printKit}>
-          <Printer className="h-4 w-4" /> Print Emergency Kit
+          <Printer className="h-4 w-4" /> Print codes
         </KhButton>
         <KhButton variant="amberGhost" onClick={() => setRegenOpen(true)}>
           <RefreshCw className="h-4 w-4" /> Regenerate
@@ -172,8 +171,8 @@ export default function RecoveryCodesCard() {
               <AlertTriangle className="h-5 w-5 text-kh-warning" /> Regenerate codes?
             </DialogTitle>
             <DialogDescription className="text-kh-muted">
-              Old codes stop working immediately. If your printed Emergency Kit is lying in a
-              drawer, it becomes scrap paper — print the new one.
+              Old codes stop working as soon as the new ones are saved. A printed or downloaded
+              copy of the old codes becomes useless — save the new ones.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -181,7 +180,7 @@ export default function RecoveryCodesCard() {
               Keep current codes
             </KhButton>
             <KhButton
-              onClick={regenerate}
+              onClick={() => void regenerate()}
               className="border border-kh-warning/50 text-kh-warning hover:bg-kh-warning hover:text-[#04110B]"
             >
               <RefreshCw className="h-4 w-4" /> Regenerate

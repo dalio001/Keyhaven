@@ -84,14 +84,14 @@ export default function OtpInput({
             <div
               key={i}
               className={cn(
-                'relative flex h-[52px] w-11 items-center justify-center rounded-md border bg-kh-inset font-mono text-[20px] font-medium transition-colors duration-150',
+                'relative flex h-[52px] w-11 items-center justify-center rounded-md border bg-kh-base font-mono text-[20px] font-medium transition-colors duration-150',
                 error
                   ? 'border-kh-danger/70 text-kh-danger'
                   : success
                     ? 'border-kh-mint/60 text-kh-mint'
                     : isActive
                       ? 'border-kh-cyan/70 text-kh-primary shadow-[0_0_0_2px_rgba(56,225,255,.15)]'
-                      : 'border-kh-line text-kh-primary',
+                      : 'border-kh-faint/60 text-kh-primary',
               )}
             >
               {digit && (

@@ -1,7 +1,7 @@
 /**
  * AppShell — KeyHaven app shell for /vault (design.md §6.2): 264px sidebar
  * (72px icon rail <1100px, bottom tab bar <720px), 64px top bar with ⌘K
- * search pill, "Encrypted · local" status chip, avatar menu, and the
+ * search pill, save-status chip (saved / saving / not saved), avatar menu, and the
  * auto-lock countdown widget (amber <60s, click = lock now).
  * Self-contained under src/components/vault/.
  */
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useVault } from '@/providers/VaultProvider';
+import SaveStatus from '@/components/SaveStatus';
 import { cn } from '@/lib/utils';
 import { CATEGORY_META, CATEGORY_ORDER, formatCountdown } from './vault-utils';
 import type { CategoryFilter } from './vault-utils';
@@ -231,10 +232,7 @@ export default function AppShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
-            <span className="hidden items-center gap-2 rounded-full border border-kh-line bg-kh-surface px-3 py-1.5 text-xs text-kh-muted min-[900px]:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-kh-mint animate-dot-pulse" aria-hidden />
-              Encrypted · local
-            </span>
+            <SaveStatus className="hidden min-[900px]:flex" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" aria-label="Account menu" className="rounded-full transition-transform hover:scale-105">

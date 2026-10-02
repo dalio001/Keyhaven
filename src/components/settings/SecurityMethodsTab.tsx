@@ -1,11 +1,11 @@
 /**
- * Settings tab 1 — Security methods: locks overview, passkeys, authenticator
- * (TOTP), recovery codes, master password, auto-lock & clipboard.
+ * Settings tab 1 — Security methods: locks overview, authenticator (TOTP),
+ * authenticator backup codes, master password, auto-lock & clipboard.
+ * (Passkey unlock is disabled — see LocksOverviewCard / docs/security-model.md.)
  */
 
 import { useState } from 'react';
 import LocksOverviewCard from './LocksOverviewCard';
-import PasskeysCard from './PasskeysCard';
 import TotpCard from './TotpCard';
 import RecoveryCodesCard from './RecoveryCodesCard';
 import MasterPasswordCard from './MasterPasswordCard';
@@ -22,7 +22,6 @@ export default function SecurityMethodsTab() {
           document.getElementById('master-password')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }}
       />
-      <PasskeysCard />
       <TotpCard />
       <RecoveryCodesCard />
       <MasterPasswordCard expanded={masterExpanded} onExpandedChange={setMasterExpanded} />

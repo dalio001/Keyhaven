@@ -381,6 +381,9 @@ export default function Unlock() {
                   onVaultCreated={() => {
                     createdHereRef.current = true;
                   }}
+                  onVaultCreateFailed={() => {
+                    createdHereRef.current = false;
+                  }}
                   hasVault={hasVault && !createdHereRef.current}
                   onSwitchToUnlock={() => switchMode('unlock')}
                 />

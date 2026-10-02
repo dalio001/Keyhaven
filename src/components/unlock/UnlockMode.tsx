@@ -126,6 +126,7 @@ const LOCK_REASON_TEXT: Record<string, string> = {
   stale: 'Locked because the vault was changed in another tab — unlock to load the latest version.',
   replaced: 'The vault on this device was replaced (import or restore). Unlock it with its own master password.',
   deleted: 'The vault was deleted in another tab.',
+  conflict: 'Unsaved changes from this tab were discarded. Unlock to load the latest version.',
 };
 
 /** Shown while the last session's encrypted changes have not reached storage. */

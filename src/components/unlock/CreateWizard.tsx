@@ -60,8 +60,14 @@ export interface CreateWizardProps {
   onBackToUnlock: () => void;
   /** report the current step (parent fills the backdrop ring per quarter) */
   onStepChange: (step: number) => void;
-  /** the wizard created + unlocked the vault (parent must not auto-redirect) */
+  /**
+   * the wizard is creating (and unlocking) the vault — called BEFORE creation
+   * starts, because the vault becomes unlocked before createVault() resolves
+   * and the parent must not auto-redirect mid-wizard
+   */
   onVaultCreated: () => void;
+  /** creation failed (e.g. a vault already exists): undo onVaultCreated */
+  onVaultCreateFailed?: () => void;
   /** a vault already exists on this device → edge banner */
   hasVault: boolean;
   onSwitchToUnlock: () => void;
@@ -72,6 +78,7 @@ export default function CreateWizard({
   onBackToUnlock,
   onStepChange,
   onVaultCreated,
+  onVaultCreateFailed,
   hasVault,
   onSwitchToUnlock,
 }: CreateWizardProps) {
@@ -148,11 +155,12 @@ export default function CreateWizard({
       // derive the key + write the encrypted vault record right away, so the
       // remaining wizard steps (authenticator, backup codes) operate on it.
       // createVault never overwrites an existing vault.
+      onVaultCreated();
       await createVault(password, { seedSample: true });
       setVaultCreated(true);
-      onVaultCreated();
       goTo(2);
     } catch (err) {
+      onVaultCreateFailed?.();
       setCreateError(err instanceof Error ? err.message : 'Could not create the vault on this device — please try again.');
     }
     setCreating(false);

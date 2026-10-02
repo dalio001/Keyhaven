@@ -184,6 +184,16 @@ export function VaultProvider({
     }
   }, [controller]);
 
+  // drop a half-finished authenticator enrollment secret whenever the vault
+  // stops being unlocked (auto-lock, another tab, import…), not only on lock()
+  useEffect(
+    () =>
+      controller.subscribe(() => {
+        if (controller.getSnapshot().status !== 'unlocked') setPendingTotpSecret(null);
+      }),
+    [controller],
+  );
+
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') void controller.flush().catch(noop);

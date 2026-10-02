@@ -196,6 +196,19 @@ function FormBody({
     return POPULAR.filter((p) => p.domain.includes(q) || p.title.toLowerCase().includes(q)).slice(0, 6);
   }, [url]);
 
+  // opening the 2FA panel puts the cursor in the secret and scrolls the panel into view, so the
+  // click can't look like it did nothing when the panel opens below the visible area (KH-05)
+  const totpInputRef = useRef<HTMLInputElement>(null);
+  const totpPanelRef = useRef<HTMLDivElement>(null);
+  const revealTotp = useRef(false);
+  useEffect(() => {
+    if (!showTotp || !revealTotp.current) return;
+    revealTotp.current = false;
+    totpInputRef.current?.focus({ preventScroll: true });
+    const t = window.setTimeout(() => totpPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }), 350);
+    return () => window.clearTimeout(t);
+  }, [showTotp]);
+
   const notesRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const el = notesRef.current;
@@ -442,7 +455,10 @@ function FormBody({
       <motion.div {...fieldMotion(false, 5)} className="flex flex-col gap-1.5">
         <button
           type="button"
-          onClick={() => setShowTotp((v) => !v)}
+          onClick={() => {
+            revealTotp.current = !showTotp;
+            setShowTotp(!showTotp);
+          }}
           aria-expanded={showTotp}
           className="flex items-center gap-2 text-sm font-medium text-kh-cyan transition-colors hover:text-kh-mint"
         >
@@ -452,6 +468,7 @@ function FormBody({
         <AnimatePresence>
           {showTotp && (
             <motion.div
+              ref={totpPanelRef}
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
@@ -459,6 +476,7 @@ function FormBody({
             >
               <div className="flex flex-col gap-1.5 pt-1">
                 <input
+                  ref={totpInputRef}
                   value={totpInput}
                   onChange={(e) => setTotpInput(e.target.value)}
                   placeholder={mode === 'edit' && entry?.totp ? 'Paste a new secret to replace' : 'TOTP secret or otpauth:// URI'}

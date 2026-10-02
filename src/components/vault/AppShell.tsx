@@ -9,6 +9,7 @@
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import {
+  CalendarClock,
   LayoutGrid,
   Lock,
   Plus,
@@ -129,7 +130,7 @@ export default function AppShell({
   onOpenPalette: () => void;
   children: ReactNode;
 }) {
-  const { lock } = useVault();
+  const { lock, subscriptions } = useVault();
   const navigate = useNavigate();
 
   return (
@@ -171,6 +172,7 @@ export default function AppShell({
             active={activeCategory === 'favorites'}
             onClick={() => onSelectCategory('favorites')}
           />
+          <NavItem icon={CalendarClock} label="Subscriptions" count={subscriptions.length} to="/subscriptions" />
           <p className="text-eyebrow mt-4 px-3 pb-1 text-[10px] text-kh-faint max-[1100px]:hidden">
             Categories
           </p>
@@ -276,6 +278,7 @@ export default function AppShell({
         >
           <Plus className="h-5 w-5" />
         </button>
+        <TabButton icon={CalendarClock} label="Subs" ariaLabel="Subscriptions" onClick={() => navigate('/subscriptions')} />
         <TabButton icon={ShieldCheck} label="Security" onClick={() => navigate('/security')} />
         <TabButton icon={SettingsIcon} label="Settings" onClick={() => navigate('/settings')} />
       </nav>
@@ -286,11 +289,13 @@ export default function AppShell({
 function TabButton({
   icon: Icon,
   label,
+  ariaLabel,
   active,
   onClick,
 }: {
   icon: typeof LayoutGrid;
   label: string;
+  ariaLabel?: string;
   active?: boolean;
   onClick: () => void;
 }) {
@@ -299,8 +304,9 @@ function TabButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      aria-label={ariaLabel}
       className={cn(
-        'flex w-14 flex-col items-center gap-1 rounded-lg py-1 text-[10px] transition-colors',
+        'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg py-1 text-[10px] transition-colors',
         active ? 'text-kh-mint' : 'text-kh-faint hover:text-kh-primary',
       )}
     >

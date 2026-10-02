@@ -15,6 +15,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Briefcase,
+  CalendarClock,
   Clapperboard,
   Dices,
   Globe,
@@ -126,6 +127,10 @@ export default function SecurityShell({ children }: { children: ReactNode }) {
             <Star className="h-[18px] w-[18px] shrink-0" />
             <span className="max-[1100px]:hidden">Favorites</span>
             <CountBadge count={counts.favorites} />
+          </Link>
+          <Link to="/subscriptions" className={navRow}>
+            <CalendarClock className="h-[18px] w-[18px] shrink-0" />
+            <span className="max-[1100px]:hidden">Subscriptions</span>
           </Link>
 
           <p className="text-eyebrow px-3 pt-5 pb-2 text-kh-faint max-[1100px]:hidden">Categories</p>
@@ -270,6 +275,7 @@ export default function SecurityShell({ children }: { children: ReactNode }) {
       >
         {[
           { to: '/vault', label: 'Vault', icon: LayoutGrid },
+          { to: '/subscriptions', label: 'Subs', icon: CalendarClock },
           { to: '/security', label: 'Watchtower', icon: ShieldCheck },
           { to: '/generator', label: 'Generator', icon: Dices },
           { to: '/settings', label: 'Settings', icon: Settings },
@@ -279,8 +285,9 @@ export default function SecurityShell({ children }: { children: ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
+              aria-label={item.to === '/subscriptions' ? 'Subscriptions' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] transition-colors',
+                'flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[10px] transition-colors',
                 active ? 'text-kh-mint' : 'text-kh-faint hover:text-kh-muted',
               )}
             >

@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
 import { MotionConfig, motion, useReducedMotion } from 'framer-motion';
 import { Plus, SearchX } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
@@ -102,7 +102,9 @@ function VaultDashboard() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
   const [view, setView] = useState<'list' | 'grid'>('list');
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  // /vault?entry=<id> (from a subscription or account) opens that login
+  const [detailId, setDetailId] = useState<string | null>(() => params.get('entry'));
   const [form, setForm] = useState<FormState>({ open: false, mode: 'add', entry: null });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newId, setNewId] = useState<string | null>(null);
@@ -160,6 +162,19 @@ function VaultDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ---------- deep link: /vault?entry=<id> opened that login (above); tidy the URL ---------- */
+  useEffect(() => {
+    if (!params.has('entry')) return;
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.delete('entry');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [params, setParams]);
 
   /* ---------- keyboard: ⌘K palette + Esc closes drawers ---------- */
   useEffect(() => {

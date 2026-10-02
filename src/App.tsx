@@ -12,6 +12,7 @@ import Vault from '@/pages/Vault';
 import Security from '@/pages/Security';
 import Generator from '@/pages/Generator';
 import Settings from '@/pages/Settings';
+import Subscriptions from '@/pages/Subscriptions';
 import About from '@/pages/About';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="unlock" element={<Unlock />} />
         <Route path="vault" element={<Vault />} />
+        <Route path="subscriptions" element={<Subscriptions />} />
         <Route path="security" element={<Security />} />
         <Route path="generator" element={<Generator />} />
         <Route path="settings" element={<Settings />} />

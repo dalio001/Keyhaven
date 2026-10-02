@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 import { Navigate, NavLink, useLocation, useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import {
+  CalendarClock,
   KeyRound,
   Lock,
   Plus,
@@ -80,7 +81,7 @@ function SideNavLink({
 }
 
 function Sidebar() {
-  const { entries, lockCountdown, lock } = useVault();
+  const { entries, subscriptions, lockCountdown, lock } = useVault();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -115,6 +116,7 @@ function Sidebar() {
       <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-4 max-[1099px]:px-3" aria-label="Vault">
         <SideNavLink to="/vault" icon={<KeyRound className="h-[18px] w-[18px] shrink-0" />} label="All Items" count={entries.length} active={is('/vault')} />
         <SideNavLink to="/vault?filter=favorites" icon={<Star className="h-[18px] w-[18px] shrink-0" />} label="Favorites" count={favorites} />
+        <SideNavLink to="/subscriptions" icon={<CalendarClock className="h-[18px] w-[18px] shrink-0" />} label="Subscriptions" count={subscriptions.length} active={is('/subscriptions')} />
         <SideNavLink to="/security" icon={<ShieldCheck className="h-[18px] w-[18px] shrink-0" />} label="Watchtower" active={is('/security')} />
         <SideNavLink to="/generator" icon={<RefreshCw className="h-[18px] w-[18px] shrink-0" />} label="Generator" active={is('/generator')} />
 
@@ -254,6 +256,7 @@ function MobileTabs() {
   const location = useLocation();
   const tabs = [
     { to: '/vault', label: 'Vault', icon: KeyRound },
+    { to: '/subscriptions', label: 'Subs', icon: CalendarClock },
     { to: '/security', label: 'Watchtower', icon: ShieldCheck },
     { to: '/generator', label: 'Generator', icon: RefreshCw },
     { to: '/settings', label: 'Settings', icon: Settings },
@@ -270,6 +273,7 @@ function MobileTabs() {
           <NavLink
             key={tab.to}
             to={tab.to}
+            aria-label={tab.to === '/subscriptions' ? 'Subscriptions' : undefined}
             className={cn(
               'flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors',
               active ? 'text-kh-mint' : 'text-kh-faint hover:text-kh-muted',

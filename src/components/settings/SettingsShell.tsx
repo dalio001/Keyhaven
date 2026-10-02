@@ -11,6 +11,7 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import {
+  CalendarClock,
   Lock,
   Plus,
   Search,
@@ -25,10 +26,11 @@ import SaveStatus from '@/components/SaveStatus';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { label: 'All Items', to: '/vault', icon: Vault },
-  { label: 'Watchtower', to: '/security', icon: ShieldCheck },
-  { label: 'Generator', to: '/generator', icon: Wand2 },
-  { label: 'Settings', to: '/settings', icon: Settings2 },
+  { label: 'All Items', short: 'All Items', to: '/vault', icon: Vault },
+  { label: 'Subscriptions', short: 'Subs', to: '/subscriptions', icon: CalendarClock },
+  { label: 'Watchtower', short: 'Watchtower', to: '/security', icon: ShieldCheck },
+  { label: 'Generator', short: 'Generator', to: '/generator', icon: Wand2 },
+  { label: 'Settings', short: 'Settings', to: '/settings', icon: Settings2 },
 ] as const;
 
 function formatCountdown(secs: number): string {
@@ -120,7 +122,7 @@ function Sidebar() {
   );
 }
 
-function Topbar() {
+function Topbar({ title }: { title: string }) {
   const navigate = useNavigate();
   const { lock, lockCountdown } = useVault();
   return (
@@ -128,7 +130,7 @@ function Topbar() {
       <div className="flex items-center gap-2 text-sm">
         <span className="text-kh-faint">Vault</span>
         <span className="text-kh-faint">/</span>
-        <h1 className="font-display text-base font-semibold text-kh-primary">Settings</h1>
+        <h1 className="font-display text-base font-semibold text-kh-primary">{title}</h1>
       </div>
 
       <button
@@ -176,13 +178,14 @@ function MobileTabBar() {
           <Link
             key={item.label}
             to={item.to}
+            aria-label={item.short === item.label ? undefined : item.label}
             className={cn(
-              'flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px]',
+              'flex min-w-0 flex-1 flex-col items-center gap-1 py-2.5 text-[10px]',
               active ? 'text-kh-mint' : 'text-kh-faint',
             )}
           >
             <Icon className="h-5 w-5" />
-            {item.label}
+            {item.short}
           </Link>
         );
       })}
@@ -190,12 +193,12 @@ function MobileTabBar() {
   );
 }
 
-export default function SettingsShell({ children }: { children: ReactNode }) {
+export default function SettingsShell({ children, title = 'Settings' }: { children: ReactNode; title?: string }) {
   return (
     <div className="flex min-h-[calc(100dvh-72px)]">
       <Sidebar />
       <div className="min-w-0 flex-1">
-        <Topbar />
+        <Topbar title={title} />
         <main className="mx-auto w-full max-w-[1080px] px-4 pb-28 pt-8 sm:pb-16 md:px-8">
           {children}
         </main>

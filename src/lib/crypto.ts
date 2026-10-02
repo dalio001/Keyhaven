@@ -69,6 +69,94 @@ export function secureRandomInt(max: number): number {
 /* key derivation & vault encryption                                   */
 /* ------------------------------------------------------------------ */
 
+/** Thrown when ciphertext is malformed, tampered with, or opened with the wrong key. */
+export class IntegrityError extends Error {
+  readonly kind = 'integrity' as const;
+  constructor(message = 'Encrypted data failed its integrity check.') {
+    super(message);
+    this.name = 'IntegrityError';
+  }
+}
+
+/** A password-derived vault key plus its stored verifier. */
+export interface DerivedKey {
+  /** AES-GCM 256 key — NON-extractable: it can encrypt/decrypt but never be exported. */
+  key: CryptoKey;
+  /** base64 SHA-256 of the raw key bytes (rejects wrong passwords before decrypting) */
+  verifier: string;
+}
+
+/**
+ * Derive the vault key + verifier from a master password.
+ *
+ * PBKDF2-SHA256 → 256 bits. Byte-compatible with every existing vault: the
+ * WebCrypto `deriveKey(PBKDF2 → AES-GCM-256)` used before Phase 1 is defined
+ * as exactly these 256 derived bits, and the old verifier was SHA-256 of the
+ * exported raw key, i.e. of these same bits. The password is UTF-8 encoded
+ * with no Unicode normalization (changing that would lock users out).
+ */
+export async function deriveVaultKey(
+  password: string,
+  salt: Uint8Array | string,
+  iterations: number,
+): Promise<DerivedKey> {
+  const saltBytes = typeof salt === 'string' ? b64ToBuf(salt) : salt;
+  const baseKey = await crypto.subtle.importKey('raw', te.encode(password), 'PBKDF2', false, [
+    'deriveBits',
+  ]);
+  const bits = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes as BufferSource, iterations },
+      baseKey,
+      256,
+    ),
+  );
+  try {
+    const verifier = bufToB64(await crypto.subtle.digest('SHA-256', bits));
+    const key = await crypto.subtle.importKey('raw', bits, { name: 'AES-GCM' }, false, [
+      'encrypt',
+      'decrypt',
+    ]);
+    return { key, verifier };
+  } finally {
+    bits.fill(0); // best effort: importKey keeps its own copy
+  }
+}
+
+/**
+ * Encrypt text with AES-GCM (fresh random 12-byte IV per call).
+ * Returns the KeyHaven envelope: base64(JSON `{ iv, ct }`).
+ */
+export async function sealText(key: CryptoKey, plaintext: string): Promise<string> {
+  const iv = randomBytes(IV_BYTES);
+  const ct = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv as BufferSource },
+    key,
+    te.encode(plaintext),
+  );
+  return bufToB64(te.encode(JSON.stringify({ iv: bufToB64(iv), ct: bufToB64(ct) })));
+}
+
+/** Decrypt a {@link sealText} envelope. Throws {@link IntegrityError} on any failure. */
+export async function openText(key: CryptoKey, envelope: string): Promise<string> {
+  let iv: Uint8Array;
+  let ct: Uint8Array;
+  try {
+    const parsed = JSON.parse(td.decode(b64ToBuf(envelope))) as { iv?: unknown; ct?: unknown };
+    if (typeof parsed.iv !== 'string' || typeof parsed.ct !== 'string') throw new Error('shape');
+    iv = b64ToBuf(parsed.iv);
+    ct = b64ToBuf(parsed.ct);
+  } catch {
+    throw new IntegrityError('Encrypted data is malformed.');
+  }
+  try {
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, ct as BufferSource);
+    return td.decode(pt);
+  } catch {
+    throw new IntegrityError();
+  }
+}
+
 /**
  * Derive the AES-GCM 256 vault key from a master password.
  * PBKDF2-SHA256, 600_000 iterations (OWASP 2023 recommendation).
@@ -145,16 +233,18 @@ export async function decryptVault(key: CryptoKey, payload: string): Promise<str
 }
 
 /* ------------------------------------------------------------------ */
-/* recovery codes                                                      */
+/* authenticator backup codes                                          */
 /* ------------------------------------------------------------------ */
 
 const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars
 
 /**
- * Generate human-friendly recovery codes like `KQ7M-4PDX-9T2A`.
+ * Generate human-friendly one-time codes like `KQ7M-4PDX-9T2A`
+ * (~59 bits each). Used as authenticator backup codes — see
+ * `src/lib/store/backupCodes.ts`. They cannot recover a master password.
  * @param count number of codes (default 8)
  */
-export function generateRecoveryCodes(count = 8): string[] {
+export function generateBackupCodes(count = 8): string[] {
   const codes: string[] = [];
   for (let i = 0; i < count; i++) {
     const groups: string[] = [];

@@ -35,7 +35,7 @@ import {
   decryptVault,
   deriveKey,
   encryptVault,
-  generateRecoveryCodes,
+  generateBackupCodes,
   randomSalt,
 } from '@/lib/crypto';
 import { generateTotpSecret, totpUri, verifyTotp } from '@/lib/totp';
@@ -186,7 +186,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     const initial: VaultData = {
       entries: opts?.seedSample ? cloneSampleEntries() : [],
       settings: { ...DEFAULT_SETTINGS },
-      recoveryCodes: generateRecoveryCodes(8),
+      recoveryCodes: generateBackupCodes(8),
     };
     const blob = await encryptVault(key, JSON.stringify(initial));
     const rec = newVaultRecord(bufToB64(salt), verifier, blob);
@@ -329,7 +329,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   );
 
   const regenerateRecoveryCodes = useCallback(() => {
-    mutateData((d) => ({ ...d, recoveryCodes: generateRecoveryCodes(8) }));
+    mutateData((d) => ({ ...d, recoveryCodes: generateBackupCodes(8) }));
   }, [mutateData]);
 
   /* ---------------- TOTP enrollment ---------------- */

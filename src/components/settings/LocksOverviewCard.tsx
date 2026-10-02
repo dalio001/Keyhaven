@@ -1,7 +1,8 @@
 /**
- * Settings → Security methods → "Your locks" overview hero.
- * Three lock-status rows (master password / passkey / authenticator) plus an
- * overall protection chip; actions scroll to (and expand) the target card.
+ * Settings → Security methods → "How your vault is protected" overview.
+ * Status rows for the master password (the only key to the encryption), the
+ * authenticator (an extra check by the app) and passkeys (disabled);
+ * actions scroll to (and expand) the target card.
  */
 
 import { Fingerprint, KeyRound, Smartphone } from 'lucide-react';
@@ -14,13 +15,13 @@ function scrollToCard(id: string) {
 }
 
 export default function LocksOverviewCard({ onChangePassword }: { onChangePassword: () => void }) {
-  const { passkeys, totpEnabled } = useVault();
+  const { totpEnabled } = useVault();
 
   const rows = [
     {
       icon: KeyRound,
       name: 'Master password',
-      status: <StatusChip tone="mint">Set · strong</StatusChip>,
+      status: <StatusChip tone="mint">Encrypts your vault</StatusChip>,
       action: (
         <KhButton variant="ghost" className="px-3 py-1.5 text-xs" onClick={onChangePassword}>
           Change
@@ -28,25 +29,10 @@ export default function LocksOverviewCard({ onChangePassword }: { onChangePasswo
       ),
     },
     {
-      icon: Fingerprint,
-      name: passkeys.length === 1 ? 'Passkey' : 'Passkeys',
-      status:
-        passkeys.length > 0 ? (
-          <StatusChip tone="mint">{passkeys.length} registered</StatusChip>
-        ) : (
-          <StatusChip tone="faint">None yet</StatusChip>
-        ),
-      action: (
-        <KhButton variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => scrollToCard('passkeys')}>
-          Manage
-        </KhButton>
-      ),
-    },
-    {
       icon: Smartphone,
       name: 'Authenticator app (TOTP)',
       status: totpEnabled ? (
-        <StatusChip tone="mint">Enabled</StatusChip>
+        <StatusChip tone="mint">Extra check on</StatusChip>
       ) : (
         <StatusChip tone="faint">Not set up</StatusChip>
       ),
@@ -56,19 +42,24 @@ export default function LocksOverviewCard({ onChangePassword }: { onChangePasswo
         </KhButton>
       ),
     },
+    {
+      icon: Fingerprint,
+      name: 'Passkey unlock',
+      status: (
+        <span title="The previous passkey design stored data that could open the vault without the authenticator, so it was removed. A redesign that uses secrets held by the authenticator itself is planned.">
+          <StatusChip tone="faint">Turned off for now</StatusChip>
+        </span>
+      ),
+      action: null,
+    },
   ];
 
-  const locks = 1 + (passkeys.length > 0 ? 1 : 0) + (totpEnabled ? 1 : 0);
-  const verdict = locks >= 3 ? 'Excellent' : locks === 2 ? 'Good' : 'Fair';
 
   return (
     <SectionCard
       className="rounded-3xl"
-      headerAction={
-        <span className="border-aurora rounded-full border px-3.5 py-1.5 text-xs font-medium text-kh-primary">
-          Vault protection: <span className="text-aurora font-semibold">{verdict}</span>
-        </span>
-      }
+      title="How your vault is protected"
+      helper="Your master password is the only key to your vault's encryption. The authenticator is an extra check this app makes after it — useful against someone who learns your password and tries to unlock here, but it does not change the encryption."
     >
       <div className="-mt-2 divide-y divide-kh-line">
         {rows.map((row, i) => {

@@ -13,6 +13,18 @@ if (!globalThis.crypto?.subtle) {
 if (typeof document !== 'undefined') {
   const { cleanup } = await import('@testing-library/react');
   afterEach(() => cleanup());
+  // jsdom lacks these browser APIs used by framer-motion / Radix
+  class NoopObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  }
+  const w = window as unknown as Record<string, unknown>;
+  if (!w.IntersectionObserver) w.IntersectionObserver = NoopObserver;
+  if (!w.ResizeObserver) w.ResizeObserver = NoopObserver;
   if (!window.matchMedia) {
     window.matchMedia = ((query: string) => ({
       matches: false,

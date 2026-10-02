@@ -28,7 +28,7 @@ import type { CheckType } from '@/components/security/analysis';
 import { GROUP_IDS, analyzeVault, ignoreKey, loadIgnored, saveIgnored } from '@/components/security/analysis';
 
 export default function Security() {
-  const { status, entries, totpEnabled, passkeys, recoveryCodes } = useVault();
+  const { status, entries, totpEnabled } = useVault();
 
   const [ignored, setIgnored] = useState<Set<string>>(() => loadIgnored());
   const [highlighted, setHighlighted] = useState<CheckType | null>(null);
@@ -70,7 +70,7 @@ export default function Security() {
   const reviewBreaches = useCallback(() => scrollTo('breached'), [scrollTo]);
 
   /* ------------------------------ guard ------------------------------ */
-  if (status === 'locked' || status === 'no-vault') {
+  if (status !== 'unlocked' && status !== 'loading') {
     return <Navigate to="/unlock" replace />;
   }
   if (status === 'loading') {
@@ -103,7 +103,6 @@ export default function Security() {
         <ScoreHero
           audit={audit}
           totpEnabled={totpEnabled}
-          passkeyCount={passkeys.length}
           onScrollTo={scrollTo}
           onHighlight={setHighlighted}
         />
@@ -115,7 +114,7 @@ export default function Security() {
         <BreachScan entries={entries} onReviewBreaches={reviewBreaches} />
 
         {/* §4 — security timeline */}
-        <SecurityTimeline entries={entries} passkeys={passkeys} hasRecoveryCodes={recoveryCodes.length > 0} />
+        <SecurityTimeline entries={entries} />
 
         {/* §5 — recommendations */}
         <Recommendations />

@@ -1,6 +1,6 @@
 /**
  * About §3 — The building blocks. 2×2 card grid: AES-256-GCM, PBKDF2,
- * WebAuthn passkeys, TOTP — each with a plain-language explanation, a mono
+ * WebAuthn passkeys (paused), TOTP — each with a plain-language explanation, a mono
  * spec footer, and a "Where do I use this?" link to the real surface.
  */
 
@@ -25,23 +25,23 @@ const BLOCKS = [
     icon: KeyRound,
     name: 'PBKDF2 · 600,000×',
     tagline: 'The key maker.',
-    body: 'Stretches your master password with deliberate, memory-hard work — fast for you (a blink), brutal for guessing machines.',
+    body: 'Stretches your master password with deliberately slow, repeated hashing — a blink for you, costly for every guess an attacker makes.',
     spec: '600k iterations · SHA-256 · OWASP 2023',
     link: { label: 'Where do I use this?', to: '/unlock', hint: 'Every unlock' },
   },
   {
     icon: Fingerprint,
     name: 'WebAuthn passkeys',
-    tagline: 'The touch.',
-    body: 'Your device’s biometrics or a hardware key unlocks the vault — phishing-resistant by design, nothing to type or steal.',
-    spec: 'FIDO2 · platform + roaming authenticators',
-    link: { label: 'Where do I use this?', to: '/settings', hint: 'Settings → Security methods' },
+    tagline: 'Paused, for good reason.',
+    body: 'Passkey unlock is turned off. The earlier design stored data that could open the vault without the passkey, so it was removed and existing vaults are re-encrypted. It returns only when the key comes from the authenticator itself.',
+    spec: 'paused · redesign on authenticator-held keys (PRF)',
+    link: { label: 'Read the details', to: '/settings', hint: 'Settings → Security methods' },
   },
   {
     icon: Smartphone,
     name: 'TOTP (RFC 6238)',
-    tagline: 'The second lock.',
-    body: 'Google Authenticator & friends generate a new 6-digit code every 30 seconds from a secret only your phone holds.',
+    tagline: 'The extra check.',
+    body: 'Google Authenticator & friends generate a new 6-digit code every 30 seconds. KeyHaven asks for it after your master password — a check made by the app, not part of the encryption.',
     spec: '30s window · HMAC-SHA1 · offline',
     link: { label: 'Where do I use this?', to: '/settings', hint: 'Settings → Security methods' },
   },

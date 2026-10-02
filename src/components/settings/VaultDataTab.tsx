@@ -1,19 +1,16 @@
 /**
  * Settings tab 2 — Vault & data.
- * Encrypted backup export (ciphertext file + size toast) and import
- * (dropzone → validate → backup-password prompt → import + unlock + summary),
- * "This device" session card with real record metadata, and the danger zone
- * (clear trusted devices / delete vault with type-to-confirm).
+ * - Encrypted backup export: saves pending edits first, then downloads exactly
+ *   the encrypted record stored in this browser (ciphertext only).
+ * - Import: the file, its master password and its contents are verified in
+ *   memory BEFORE anything is replaced. The replaced vault is kept on this
+ *   device ("previous vault") and can be restored or deleted. Legacy backups
+ *   are upgraded (new key, passkey data removed) as they are imported.
+ * - "This device" card and the danger zone (delete vault with type-to-confirm).
  */
 
-import { useEffect, useRef, useState } from 'react';
-import {
-  AlertTriangle,
-  Download,
-  MonitorSmartphone,
-  Trash2,
-  Upload,
-} from 'lucide-react';
+import { useRef, useState } from 'react';
+import { AlertTriangle, Download, History, MonitorSmartphone, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -26,12 +23,26 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useVault } from '@/providers/VaultProvider';
-import { buildExportFile, loadVaultRecord, parseExportFile } from '@/lib/vault';
-import type { VaultRecord } from '@/lib/vault';
+import { FormatError, legacyPasskeyCount, parseBackupFile } from '@/lib/store/format';
+import type { ParsedBackup } from '@/lib/store/format';
+import type { ImportFailure } from '@/lib/store/controller';
+import { downloadBackupFile } from '@/lib/download';
 import { KhButton, SectionCard, Spinner, StatusChip } from './ui';
 import { cn } from '@/lib/utils';
 
 const LAST_EXPORT_KEY = 'keyhaven:last-export';
+
+const IMPORT_ERRORS: Record<ImportFailure, string> = {
+  'invalid-file': 'This file is not a valid KeyHaven backup.',
+  'unsupported-version': 'This backup was made by a newer version of KeyHaven — update KeyHaven to import it.',
+  'bad-password': 'That password doesn’t open this backup. Nothing was changed.',
+  corrupt: 'This backup failed its integrity check (damaged or altered). Nothing was changed.',
+  'current-unsaved':
+    'Your current vault has changes that could not be saved yet, so nothing was replaced. Export or retry saving first.',
+  conflict: 'The vault was changed in another tab while importing. Nothing was replaced — try again.',
+  'storage-error': 'This browser’s storage refused the import. Nothing was replaced.',
+  'not-allowed': 'Unlock your vault before importing a backup.',
+};
 
 function fmtDateTime(iso: string | null | undefined): string {
   if (!iso) return 'never';
@@ -65,30 +76,40 @@ function browserName(): string {
 /* ------------------------------------------------------------------ */
 
 function BackupCard() {
-  const { entries, exportVault, importVault, unlock } = useVault();
+  const { entries, exportBackup, importBackup, previousVault, restorePreviousVault, discardPreviousVault } =
+    useVault();
   const [exporting, setExporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [lastExport, setLastExport] = useState<string | null>(() =>
-    localStorage.getItem(LAST_EXPORT_KEY),
-  );
-  const [pending, setPending] = useState<null | { file: File; record: VaultRecord }>(null);
+  const [lastExport, setLastExport] = useState<string | null>(() => localStorage.getItem(LAST_EXPORT_KEY));
+  const [pending, setPending] = useState<null | { text: string; parsed: ParsedBackup }>(null);
   const [password, setPassword] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [prevAction, setPrevAction] = useState<null | 'restore' | 'delete'>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const doExport = async () => {
     setExporting(true);
     try {
-      const rec = await loadVaultRecord();
-      const size = rec ? new Blob([buildExportFile(rec)]).size : 0;
-      exportVault();
-      const stamp = new Date().toISOString();
-      localStorage.setItem(LAST_EXPORT_KEY, stamp);
-      setLastExport(stamp);
-      toast.success(
-        `Encrypted backup downloaded (${(size / 1024).toFixed(1)} KB of ciphertext)`,
-      );
+      const result = await exportBackup();
+      if (result.ok) {
+        downloadBackupFile(result.text);
+        const stamp = new Date().toISOString();
+        localStorage.setItem(LAST_EXPORT_KEY, stamp);
+        setLastExport(stamp);
+        toast.success(
+          `Encrypted backup file created (${(new Blob([result.text]).size / 1024).toFixed(1)} KB of ciphertext)`,
+        );
+      } else if (result.unsavedText) {
+        const text = result.unsavedText;
+        toast.error('Your latest changes could not be saved to this browser', {
+          description: 'You can still download them as an encrypted file (it opens with your master password).',
+          action: { label: 'Download', onClick: () => downloadBackupFile(text, 'unsaved-changes') },
+          duration: 15_000,
+        });
+      } else {
+        toast.error('Export failed — the vault could not be read back from browser storage');
+      }
     } finally {
       setTimeout(() => setExporting(false), 400);
     }
@@ -97,50 +118,60 @@ function BackupCard() {
   const pickFile = async (file: File | null | undefined) => {
     if (!file) return;
     try {
-      const record = parseExportFile(await file.text());
-      setPending({ file, record });
+      const text = await file.text();
+      setPending({ text, parsed: parseBackupFile(text) });
       setPassword('');
       setImportError(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Not a valid KeyHaven backup file');
+      toast.error(err instanceof FormatError ? err.message : 'Not a valid KeyHaven backup file');
     }
   };
 
   const doImport = async () => {
-    if (!pending || importing) return;
+    if (!pending || importing || !password) return;
     setImporting(true);
     setImportError(null);
-    const result = await importVault(pending.file);
+    const result = await importBackup(pending.text, password);
+    setImporting(false);
     if (!result.ok) {
-      setImporting(false);
-      setImportError(result.error ?? 'Import failed');
+      setImportError(result.detail ?? IMPORT_ERRORS[result.reason]);
       return;
     }
-    // provider is now locked around the imported record — unlock with its password
-    const unlockResult = await unlock(password);
-    setImporting(false);
-    if (unlockResult === 'ok') {
-      setPending(null);
-      toast.success('Backup imported — vault unlocked');
-    } else if (unlockResult === 'totp-required') {
-      setPending(null);
-      toast.info('Backup imported — this vault also asks for your authenticator code', {
-        duration: 4000,
+    setPending(null);
+    setPassword('');
+    const migrated = result.migrated ? ' It was upgraded to the new encrypted format.' : '';
+    if (result.unlocked) {
+      toast.success(`Backup imported — vault unlocked.${migrated}`, {
+        description: 'Your previous vault is kept on this device until you delete it.',
+      });
+    } else {
+      toast.info(`Backup imported.${migrated} Unlock it with its master password and authenticator code.`, {
+        duration: 5000,
       });
       // the app-shell guard routes to /unlock on its own
-    } else {
-      setImportError(
-        unlockResult === 'totp-invalid'
-          ? 'That authenticator code didn’t match.'
-          : 'That password doesn’t match this backup. The imported vault stays on this device — you can retry from the unlock screen.',
-      );
     }
   };
+
+  const doPrevious = async () => {
+    if (prevAction === 'restore') {
+      const r = await restorePreviousVault();
+      setPrevAction(null);
+      if (r === 'ok') toast.success('Previous vault restored — unlock it with its own master password');
+      else if (r === 'current-unsaved') toast.error('Your current changes are not saved yet — nothing was swapped');
+      else toast.error('The previous vault could not be restored — nothing was changed');
+    } else if (prevAction === 'delete') {
+      await discardPreviousVault();
+      setPrevAction(null);
+      toast.success('Previous vault deleted from this device');
+    }
+  };
+
+  const legacyCount = pending ? legacyPasskeyCount(pending.parsed.record) : 0;
 
   return (
     <SectionCard
       title="Backup & restore"
-      helper="Your vault lives only in this browser. Export an encrypted backup file (AES-256-GCM, needs your master password to open) and import it on any device."
+      helper="Your vault lives only in this browser. Export an encrypted backup file (AES-256-GCM, opens only with the master password in use when you export) and import it on any device."
     >
       <div className="flex flex-wrap gap-3">
         <KhButton variant="primary" onClick={() => void doExport()} disabled={exporting}>
@@ -187,8 +218,27 @@ function BackupCard() {
         <p className="text-sm text-kh-muted">
           Drop a <span className="font-mono text-xs">keyhaven-backup-*.json</span> here, or click to browse
         </p>
-        <p className="text-xs text-kh-faint">It stays encrypted — we never see the contents.</p>
+        <p className="text-xs text-kh-faint">It stays encrypted — it is checked on this device before anything is replaced.</p>
       </div>
+
+      {previousVault && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-kh-line bg-kh-inset px-4 py-3">
+          <History className="h-4 w-4 shrink-0 text-kh-cyan" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-kh-primary">Previous vault kept on this device</p>
+            <p className="text-xs text-kh-faint">
+              Replaced by your last import or restore (last saved {fmtDateTime(previousVault.updatedAt)}). Still
+              encrypted with its own master password.
+            </p>
+          </div>
+          <KhButton variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => setPrevAction('restore')}>
+            Restore it
+          </KhButton>
+          <KhButton variant="dangerGhost" className="px-3 py-1.5 text-xs" onClick={() => setPrevAction('delete')}>
+            Delete it
+          </KhButton>
+        </div>
+      )}
 
       <p className="mt-4 font-mono text-[11px] leading-5 text-kh-faint">
         Last export: {fmtDateTime(lastExport)} · Vault size: {entries.length} entries · Storage:
@@ -201,16 +251,28 @@ function BackupCard() {
           <DialogHeader>
             <DialogTitle className="text-kh-primary">Import this backup?</DialogTitle>
             <DialogDescription className="text-kh-muted">
-              Exported {fmtDateTime(pending?.record.updatedAt)} ·{' '}
-              {pending?.record.passkeys?.length ?? 0} passkey(s) ·{' '}
-              {pending?.record.totpEnabled ? 'authenticator enabled' : 'no authenticator'}.
+              {pending?.parsed.exportedAt ? `Exported ${fmtDateTime(pending.parsed.exportedAt)} · ` : ''}
+              {pending?.parsed.record.version === 1 ? 'older format (will be upgraded) · ' : ''}
+              {pending?.parsed.record.totpEnabled ? 'authenticator enabled' : 'no authenticator'}.
             </DialogDescription>
           </DialogHeader>
+          {legacyCount > 0 && (
+            <div className="flex items-start gap-3 rounded-xl border border-kh-danger/30 bg-kh-danger/5 p-3.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kh-danger" />
+              <p className="text-sm leading-6 text-kh-muted">
+                This file contains old passkey data that lets anyone holding the file open it{' '}
+                <span className="text-kh-primary">without your master password</span>. Importing re-encrypts the
+                vault with a fresh key and drops that data — but the file itself stays unsafe: delete it and its
+                copies after importing.
+              </p>
+            </div>
+          )}
           <div className="flex items-start gap-3 rounded-xl border border-kh-warning/30 bg-kh-warning/5 p-3.5">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kh-warning" />
             <p className="text-sm leading-6 text-kh-muted">
-              Importing <span className="text-kh-primary">replaces</span> the vault currently on
-              this device. Export a backup of it first if you’re unsure.
+              Importing <span className="text-kh-primary">replaces</span> the vault currently on this device after
+              the password is verified. The current vault is kept on this device as the “previous vault” until you
+              delete it.
             </p>
           </div>
           <div className="space-y-2 py-1">
@@ -236,13 +298,37 @@ function BackupCard() {
             <KhButton variant="primary" onClick={() => void doImport()} disabled={!password || importing}>
               {importing ? (
                 <>
-                  <Spinner /> Importing…
+                  <Spinner /> Verifying…
                 </>
               ) : (
                 <>
-                  <Upload className="h-4 w-4" /> Import & unlock
+                  <Upload className="h-4 w-4" /> Verify & import
                 </>
               )}
+            </KhButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* previous-vault confirm */}
+      <Dialog open={prevAction !== null} onOpenChange={(open) => !open && setPrevAction(null)}>
+        <DialogContent className="border-kh-line bg-kh-elevated sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="text-kh-primary">
+              {prevAction === 'restore' ? 'Restore the previous vault?' : 'Delete the previous vault?'}
+            </DialogTitle>
+            <DialogDescription className="text-kh-muted">
+              {prevAction === 'restore'
+                ? 'The two vaults swap places: the previous one becomes current (locked — unlock it with its own master password) and the current one is kept as the previous vault.'
+                : 'The previous vault is permanently deleted from this browser. Your current vault is not affected.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <KhButton variant="ghost" onClick={() => setPrevAction(null)}>
+              Cancel
+            </KhButton>
+            <KhButton variant={prevAction === 'delete' ? 'danger' : 'primary'} onClick={() => void doPrevious()}>
+              {prevAction === 'restore' ? 'Restore' : 'Delete'}
             </KhButton>
           </DialogFooter>
         </DialogContent>
@@ -254,25 +340,8 @@ function BackupCard() {
 /* ------------------------------------------------------------------ */
 
 function DevicesCard() {
-  const [meta, setMeta] = useState<{ createdAt: string; updatedAt: string } | null>(null);
+  const { save } = useVault();
   const [sessionStart] = useState(() => new Date().toISOString());
-
-  useEffect(() => {
-    void loadVaultRecord().then((rec) => {
-      if (rec) setMeta({ createdAt: rec.createdAt, updatedAt: rec.updatedAt });
-    });
-  }, []);
-
-  const clearTrusted = () => {
-    // trusted-device flags live in localStorage under this prefix
-    const doomed: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('keyhaven:trusted')) doomed.push(k);
-    }
-    doomed.forEach((k) => localStorage.removeItem(k));
-    toast.success('Trusted-device flags cleared on this browser');
-  };
 
   return (
     <SectionCard
@@ -291,13 +360,7 @@ function DevicesCard() {
       </div>
 
       <div className="mt-3 space-y-1.5 font-mono text-[11px] leading-5 text-kh-faint">
-        <p>vault created {fmtDateTime(meta?.createdAt)} · last change {fmtDateTime(meta?.updatedAt)}</p>
-      </div>
-
-      <div className="mt-4">
-        <KhButton variant="ghost" onClick={clearTrusted}>
-          Sign out of other remembered devices
-        </KhButton>
+        <p>last saved to this browser {fmtDateTime(save.lastSavedAt)}</p>
       </div>
     </SectionCard>
   );
@@ -317,19 +380,14 @@ function DangerZoneCard() {
   const doDelete = async () => {
     if (!canDelete) return;
     setDeleting(true);
-    await destroyVault();
-    toast.success('Vault deleted. This device is clean.');
-    // guard routes to /unlock?mode=create
-  };
-
-  const clearTrusted = () => {
-    const doomed: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('keyhaven:trusted')) doomed.push(k);
+    try {
+      await destroyVault();
+      toast.success('Vault deleted from this browser.');
+      // guard routes to /unlock?mode=create
+    } catch {
+      setDeleting(false);
+      toast.error('This browser’s storage refused the deletion — the vault is still here.');
     }
-    doomed.forEach((k) => localStorage.removeItem(k));
-    toast.success('Trusted-device flags cleared');
   };
 
   return (
@@ -342,18 +400,10 @@ function DangerZoneCard() {
       <div className="divide-y divide-kh-line">
         <div className="flex flex-wrap items-center justify-between gap-3 py-3.5">
           <div>
-            <p className="text-sm font-medium text-kh-primary">Clear all trusted devices</p>
-            <p className="text-xs text-kh-faint">Every browser forgets it was ever trusted.</p>
-          </div>
-          <KhButton variant="amberGhost" onClick={clearTrusted}>
-            Clear trusted devices
-          </KhButton>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 py-3.5">
-          <div>
             <p className="text-sm font-medium text-kh-primary">Delete vault on this device</p>
             <p className="text-xs text-kh-faint">
-              Wipes the encrypted vault from IndexedDB. Without a backup, it’s gone forever.
+              Wipes the encrypted vault (and any previous vault kept from an import) from this browser.
+              Without a backup, it’s gone forever. Backup files you exported are not affected.
             </p>
           </div>
           <KhButton variant="danger" onClick={() => setDeleteOpen(true)}>

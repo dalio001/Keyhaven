@@ -24,7 +24,7 @@ function webglAvailable(): boolean {
   }
 }
 
-const TRUST_CHIPS = ['AES-256-GCM', 'PBKDF2 600k', 'Passkey / WebAuthn', 'Works offline'];
+const TRUST_CHIPS = ['AES-256-GCM', 'PBKDF2 600k', 'Encrypted backups', 'Works offline'];
 
 export default function HeroSection() {
   const navigate = useNavigate();
@@ -91,8 +91,8 @@ export default function HeroSection() {
             className="mt-6 max-w-[52ch] text-lg leading-[30px] text-kh-muted"
           >
             KeyHaven keeps every login you own behind one vault that's encrypted right here in your
-            browser — and unlockable only by you: with your master password, a passkey, or Google
-            Authenticator.
+            browser — and unlockable only with your master password, plus an optional Google
+            Authenticator check.
           </motion.p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">

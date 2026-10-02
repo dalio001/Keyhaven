@@ -20,19 +20,19 @@ const FAQS = [
   },
   {
     q: 'Is browser storage really safe enough?',
-    a: 'It only ever holds ciphertext sealed with AES-256-GCM. Without your key it’s indistinguishable from random noise; passkeys and an authenticator add locks on top.',
+    a: 'It only ever holds ciphertext sealed with AES-256-GCM. Without your master password it’s indistinguishable from random noise. Anyone with access to your browser profile can copy that ciphertext, so a long, unique master password is what protects it.',
   },
   {
     q: 'Which unlock method should I use?',
-    a: 'Master password + Google Authenticator is the recommended baseline; add a passkey for daily one-touch unlock. All three can coexist on the same vault.',
+    a: 'A long, unique master password is the key to everything. Add Google Authenticator for an extra check at unlock, and save its one-time backup codes in case you lose your phone. Passkey unlock is paused for now.',
   },
   {
     q: 'Can someone bypass the authenticator with my laptop?',
-    a: 'No. The TOTP secret lives in your phone’s authenticator app, and the vault asks for a fresh 30-second code. A stolen laptop alone isn’t enough.',
+    a: 'Not without your master password. The vault is encrypted with a key from your master password only; the authenticator is an extra check the app makes. Someone who had your master password AND a copy of your vault data could decrypt it without the authenticator — so the master password is what really protects you.',
   },
   {
     q: 'What happens if I lose everything?',
-    a: 'Recovery codes (generated at setup) restore access. Print the Emergency Kit and keep it somewhere physical — a drawer beats a cloud note.',
+    a: 'If you forget your master password, the vault can’t be decrypted — by anyone. Keep the password somewhere safe and keep encrypted backups. Authenticator backup codes only help if you lose your phone.',
   },
   {
     q: 'Is the code auditable?',

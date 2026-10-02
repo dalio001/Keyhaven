@@ -23,7 +23,7 @@ const AUTO_LOCK_OPTIONS = [
   { value: '1', label: '1 minute' },
   { value: '5', label: '5 minutes (default)' },
   { value: '15', label: '15 minutes' },
-  { value: '0', label: 'When tab closes' },
+  { value: '0', label: 'Only when the tab closes' },
 ];
 
 const CLIPBOARD_OPTIONS = [
@@ -84,11 +84,15 @@ function SettingRow({
 }
 
 export default function AutoLockCard() {
-  const { settings, updateSettings } = useVault();
+  const { settings, updateSettings, flush } = useVault();
 
   const clipboardValue = settings.clipboardClearSeconds >= 3600 ? String(NEVER_SECONDS) : String(settings.clipboardClearSeconds);
 
-  const saved = () => toast.success('Preference saved', { duration: 1600 });
+  const saved = () =>
+    flush().then(
+      () => toast.success('Preference saved', { duration: 1600 }),
+      () => toast.error("Preference not saved to this browser yet — KeyHaven is retrying"),
+    );
 
   return (
     <SectionCard
@@ -100,12 +104,11 @@ export default function AutoLockCard() {
         <SettingRow
           icon={Clock}
           title="Auto-lock"
-          helper="Vault locks itself after inactivity. Unlock again with any method."
+          helper="Vault locks itself after inactivity. Pending changes are encrypted and saved first."
           value={String(settings.autoLockMinutes)}
           options={AUTO_LOCK_OPTIONS}
           onChange={(v) => {
-            updateSettings({ autoLockMinutes: Number(v) });
-            saved();
+            if (updateSettings({ autoLockMinutes: Number(v) })) void saved();
           }}
         />
         <SettingRow
@@ -115,8 +118,7 @@ export default function AutoLockCard() {
           value={clipboardValue}
           options={CLIPBOARD_OPTIONS}
           onChange={(v) => {
-            updateSettings({ clipboardClearSeconds: Number(v) });
-            saved();
+            if (updateSettings({ clipboardClearSeconds: Number(v) })) void saved();
           }}
         />
         <SettingRow
@@ -126,8 +128,7 @@ export default function AutoLockCard() {
           value={String(settings.remaskSeconds)}
           options={REMASK_OPTIONS}
           onChange={(v) => {
-            updateSettings({ remaskSeconds: Number(v) });
-            saved();
+            if (updateSettings({ remaskSeconds: Number(v) })) void saved();
           }}
         />
       </div>

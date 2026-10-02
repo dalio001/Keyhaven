@@ -1,6 +1,6 @@
 /**
  * Home §3 — Features bento. Six cards: zero-knowledge encryption (with a
- * live type→ciphertext demo), passkey unlock (animated VaultRing), TOTP
+ * live type→ciphertext demo), passkey status (animated VaultRing), TOTP
  * (live 30s code + countdown ring), Watchtower, password generator (live
  * regenerate + scramble), encrypted export/import.
  */
@@ -167,8 +167,8 @@ const CARDS = [
     span: 'md:col-span-6 lg:col-span-4',
     icon: <Fingerprint className="h-6 w-6 text-kh-violet" />,
     ring: true,
-    title: 'Passkey unlock',
-    body: 'Unlock with your face, finger, or security key. WebAuthn passkeys — no typing at all.',
+    title: 'Passkeys — coming back',
+    body: 'Passkey unlock is paused: the earlier design stored data that could open a vault without the passkey. It returns only with keys held by the authenticator itself.',
     to: '/about',
   },
   {
@@ -177,7 +177,7 @@ const CARDS = [
     icon: <Smartphone className="h-6 w-6 text-kh-cyan" />,
     demo: <TotpDemo />,
     title: 'Google Authenticator & TOTP',
-    body: 'Add a second lock with any authenticator app — Google Authenticator, Authy, and more.',
+    body: 'An extra 6-digit check after your master password — works with Google Authenticator, Authy, and more.',
     to: '/about',
   },
   {

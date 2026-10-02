@@ -2,7 +2,10 @@
  * Settings → Security methods → Authenticator app (TOTP) card.
  * Real enrollment: beginTotpEnrollment() → otpauth:// URI rendered as a real
  * scannable QR (qrcode.react), manual base32 fallback, 6-digit OTP confirm
- * (auto-submits), cancel, re-enroll, and disable (code-gated confirm modal).
+ * (auto-submits), cancel. Disabling — and replacing (re-enrolling) — require
+ * the CURRENT authenticator code or a one-time backup code, verified by the
+ * vault. The authenticator is an extra check made by this app after the
+ * master password; it is not part of the vault's encryption.
  */
 
 import { useState } from 'react';
@@ -19,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { Input } from '@/components/ui/input';
 import { useVault } from '@/providers/VaultProvider';
 import { EASE, KhButton, SectionCard, Spinner, StatusChip } from './ui';
 import { cn } from '@/lib/utils';
@@ -93,8 +97,11 @@ export default function TotpCard() {
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [disableOpen, setDisableOpen] = useState(false);
+  const [disableOpen, setDisableOpen] = useState<null | 'disable' | 'replace'>(null);
   const [disableCode, setDisableCode] = useState('');
+  const [useBackup, setUseBackup] = useState(false);
+  const [disableBusy, setDisableBusy] = useState(false);
+  const [disableError, setDisableError] = useState<string | null>(null);
 
   // The setup panel renders only while the provider holds a pending secret —
   // a successful confirm or a cancel clears it and the panel closes itself.
@@ -117,13 +124,18 @@ export default function TotpCard() {
   const submitCode = async (v: string) => {
     if (verifying) return;
     setVerifying(true);
-    const ok = await confirmTotpEnrollment(v);
+    const result = await confirmTotpEnrollment(v);
     setVerifying(false);
-    if (ok) {
-      toast.success('Authenticator enabled — your vault now asks for a 6-digit code');
+    if (result === 'ok') {
+      toast.success('Authenticator enabled — unlocking now also asks for a 6-digit code', {
+        description: 'Save your backup codes below in case you lose your phone.',
+      });
       setSetup(null);
       setCode('');
       setCodeError(false);
+    } else if (result === 'save-failed') {
+      toast.error("Code accepted, but this browser didn't save the change yet — KeyHaven keeps retrying");
+      setSetup(null);
     } else {
       setCodeError(true);
       setTimeout(() => {
@@ -133,11 +145,36 @@ export default function TotpCard() {
     }
   };
 
-  const confirmDisable = async () => {
-    await disableTotp();
-    setDisableOpen(false);
+  const closeDisable = () => {
+    setDisableOpen(null);
     setDisableCode('');
-    toast.success('Authenticator disabled');
+    setUseBackup(false);
+    setDisableError(null);
+  };
+
+  const confirmDisable = async () => {
+    if (disableBusy || !disableOpen) return;
+    const mode = disableOpen;
+    setDisableBusy(true);
+    setDisableError(null);
+    const result = await disableTotp(useBackup ? { backupCode: disableCode } : { totp: disableCode });
+    setDisableBusy(false);
+    if (result === 'invalid-code') {
+      setDisableError(useBackup ? "That backup code didn't match or was already used." : "That code didn't match — try the current one.");
+      setDisableCode('');
+      return;
+    }
+    closeDisable();
+    if (result === 'ok') {
+      if (mode === 'replace') {
+        toast.success('Old authenticator turned off — scan the new QR to turn it back on');
+        startSetup();
+      } else {
+        toast.success('Authenticator disabled');
+      }
+    } else if (result === 'save-failed') {
+      toast.error("The change wasn't saved to this browser yet — KeyHaven keeps retrying");
+    }
   };
 
   return (
@@ -164,15 +201,15 @@ export default function TotpCard() {
             </span>
             <div className="flex-1">
               <p className="text-sm font-medium text-kh-primary">Enabled</p>
-              <p className="font-mono text-[11px] text-kh-faint">asked for at every unlock</p>
+              <p className="font-mono text-[11px] text-kh-faint">asked for after the master password at every unlock</p>
             </div>
             <CheckCircle2 className="h-5 w-5 text-kh-mint" />
           </div>
           <div className="flex flex-wrap gap-3">
-            <KhButton variant="secondary" onClick={startSetup}>
-              <RefreshCw className="h-4 w-4" /> Re-enroll (new QR)
+            <KhButton variant="secondary" onClick={() => setDisableOpen('replace')}>
+              <RefreshCw className="h-4 w-4" /> Replace authenticator
             </KhButton>
-            <KhButton variant="dangerGhost" onClick={() => setDisableOpen(true)}>
+            <KhButton variant="dangerGhost" onClick={() => setDisableOpen('disable')}>
               Disable
             </KhButton>
           </div>
@@ -185,7 +222,10 @@ export default function TotpCard() {
           <KhButton variant="secondary" onClick={startSetup}>
             <Smartphone className="h-4 w-4" /> Set up authenticator
           </KhButton>
-          <p className="text-xs text-kh-faint">Adds a second lock on top of your master password.</p>
+          <p className="text-xs text-kh-faint">
+            Adds an extra check after your master password. Your vault is still encrypted with the
+            master password alone.
+          </p>
         </div>
       )}
 
@@ -305,29 +345,62 @@ export default function TotpCard() {
 
       {/* disable modal */}
       <Dialog
-        open={disableOpen}
+        open={disableOpen !== null}
         onOpenChange={(open) => {
-          setDisableOpen(open);
-          if (!open) setDisableCode('');
+          if (!open && !disableBusy) closeDisable();
         }}
       >
         <DialogContent className="border-kh-line bg-kh-elevated sm:max-w-[440px]">
           <DialogHeader>
-            <DialogTitle className="text-kh-primary">Disable authenticator?</DialogTitle>
+            <DialogTitle className="text-kh-primary">
+              {disableOpen === 'replace' ? 'Replace authenticator?' : 'Disable authenticator?'}
+            </DialogTitle>
             <DialogDescription className="text-kh-muted">
-              Your vault will no longer ask for a 6-digit code at unlock. Enter the current code
-              from your app to confirm it’s really you.
+              {disableOpen === 'replace'
+                ? 'The current authenticator is turned off first, then you scan a new QR code. '
+                : 'Unlocking will no longer ask for a 6-digit code. '}
+              Confirm with the current code from your app — or one of your backup codes (it will be
+              used up).
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center py-2">
-            <OtpBoxes value={disableCode} onChange={setDisableCode} autoFocus />
+          <div className="flex flex-col items-center gap-3 py-2">
+            {useBackup ? (
+              <Input
+                value={disableCode}
+                onChange={(e) => setDisableCode(e.target.value.toUpperCase())}
+                placeholder="XXXX-XXXX-XXXX"
+                aria-label="Backup code"
+                autoComplete="off"
+                autoFocus
+                className="h-11 border-kh-line bg-kh-inset text-center font-mono tracking-[0.06em] text-kh-primary"
+              />
+            ) : (
+              <OtpBoxes value={disableCode} onChange={setDisableCode} error={!!disableError} autoFocus />
+            )}
+            {disableError && <p className="text-sm text-kh-danger">{disableError}</p>}
+            <button
+              type="button"
+              onClick={() => {
+                setUseBackup((u) => !u);
+                setDisableCode('');
+                setDisableError(null);
+              }}
+              className="text-xs font-medium text-kh-cyan hover:text-kh-primary"
+            >
+              {useBackup ? 'Use the authenticator code instead' : 'Lost your phone? Use a backup code'}
+            </button>
           </div>
           <DialogFooter>
-            <KhButton variant="ghost" onClick={() => setDisableOpen(false)}>
-              Keep enabled
+            <KhButton variant="ghost" onClick={closeDisable} disabled={disableBusy}>
+              Keep it
             </KhButton>
-            <KhButton variant="danger" onClick={() => void confirmDisable()} disabled={disableCode.length !== 6}>
-              Disable authenticator
+            <KhButton
+              variant="danger"
+              onClick={() => void confirmDisable()}
+              disabled={disableBusy || (useBackup ? disableCode.replace(/[^A-Z0-9]/g, '').length !== 12 : disableCode.length !== 6)}
+            >
+              {disableBusy ? <Spinner /> : null}
+              {disableOpen === 'replace' ? 'Continue' : 'Disable authenticator'}
             </KhButton>
           </DialogFooter>
         </DialogContent>

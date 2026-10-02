@@ -42,9 +42,9 @@ export default function Settings() {
     );
   }
 
-  // app-shell guard: locked → /unlock; nothing to lock → create flow
-  if (status === 'locked') return <Navigate to="/unlock" replace />;
+  // app-shell guard: nothing to lock → create flow; any other non-unlocked state → /unlock
   if (status === 'no-vault') return <Navigate to="/unlock?mode=create" replace />;
+  if (status !== 'unlocked') return <Navigate to="/unlock" replace />;
 
   return (
     <SettingsShell>
@@ -57,8 +57,8 @@ export default function Settings() {
           Settings
         </h2>
         <p className="mt-2 max-w-[62ch] text-sm leading-6 text-kh-muted">
-          Every lock on your vault, in one place — passkeys, authenticator, recovery codes,
-          master password, backups. Everything here is stored encrypted on this device only.
+          How your vault is protected, in one place — master password, authenticator, backup
+          codes, encrypted backups. Everything here is stored encrypted in this browser only.
         </p>
       </div>
 

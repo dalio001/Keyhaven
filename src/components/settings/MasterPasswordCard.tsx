@@ -1,14 +1,14 @@
 /**
  * Settings → Security methods → Change master password.
  *
- * Real re-encryption, built only on the stable public APIs of src/lib:
- *  1. verify the CURRENT password (deriveKey + verifier against the record)
- *  2. derive a NEW key (fresh salt, PBKDF2 ×600k) and re-encrypt the vault
- *     blob; re-encrypt the enrolled TOTP secret; re-wrap every passkey with
- *     the new key (wrapping keys derive from credential IDs, so passkeys keep
- *     working after the password change)
- *  3. persist the new record, then hand it to the provider via importVault()
- *     (which syncs provider state and locks) — the guard routes to /unlock.
+ * Real re-encryption via the vault controller (changeMasterPassword):
+ *  1. saves pending edits, then verifies the CURRENT password against the
+ *     stored record
+ *  2. derives a NEW key (fresh salt, PBKDF2 ×600k) and re-encrypts the
+ *     latest vault contents and the authenticator secret
+ *  3. commits atomically (compare-and-swap) and keeps the vault unlocked
+ *     with the new key. Failures leave the old password working.
+ * Backups exported earlier still open with the password used at the time.
  */
 
 import { useMemo, useState } from 'react';
@@ -16,20 +16,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { zxcvbn } from 'zxcvbn-ts';
-import {
-  KDF_ITERATIONS,
-  b64ToBuf,
-  bufToB64,
-  computeVerifier,
-  decryptVault,
-  deriveKey,
-  encryptVault,
-  exportRawKey,
-  randomSalt,
-} from '@/lib/crypto';
-import { buildExportFile, loadVaultRecord, saveVaultRecord } from '@/lib/vault';
-import type { VaultData, VaultRecord } from '@/lib/vault';
-import type { WrappedKeyBlob } from '@/lib/webauthn';
 import { useVault } from '@/providers/VaultProvider';
 import { EASE, KhButton, SectionCard, Spinner } from './ui';
 
@@ -107,21 +93,6 @@ function SecretInput({
   );
 }
 
-/** Re-wrap one passkey blob around the new vault key (mirrors webauthn.ts). */
-async function rewrapPasskey(blob: WrappedKeyBlob, newKey: CryptoKey): Promise<WrappedKeyBlob> {
-  const idBytes = b64ToBuf(blob.credentialId);
-  const saltBytes = b64ToBuf(blob.salt);
-  const material = new Uint8Array(idBytes.length + saltBytes.length);
-  material.set(idBytes, 0);
-  material.set(saltBytes, idBytes.length);
-  const digest = await crypto.subtle.digest('SHA-256', material);
-  const wrappingKey = await crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, [
-    'encrypt',
-    'decrypt',
-  ]);
-  return { ...blob, wrappedKey: await encryptVault(wrappingKey, await exportRawKey(newKey)) };
-}
-
 type Phase = 'idle' | 'verifying' | 'reencrypting' | 'done';
 
 export default function MasterPasswordCard({
@@ -131,7 +102,7 @@ export default function MasterPasswordCard({
   expanded: boolean;
   onExpandedChange: (v: boolean) => void;
 }) {
-  const { entries, settings, recoveryCodes, importVault } = useVault();
+  const { changeMasterPassword } = useVault();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -154,48 +125,23 @@ export default function MasterPasswordCard({
   const submit = async () => {
     if (!valid || busy) return;
     setError(null);
-    try {
-      setPhase('verifying');
-      const rec = await loadVaultRecord();
-      if (!rec) throw new Error('No vault on this device.');
-      const oldKey = await deriveKey(current, b64ToBuf(rec.salt), rec.kdf.iterations);
-      if ((await computeVerifier(oldKey)) !== rec.verifier) {
-        setError('Current password is incorrect.');
-        setPhase('idle');
-        return;
-      }
-
-      setPhase('reencrypting');
-      const newSalt = randomSalt();
-      const newKey = await deriveKey(next, newSalt, KDF_ITERATIONS);
-      const data: VaultData = { entries, settings, recoveryCodes };
-      const nextRecord: VaultRecord = {
-        ...rec,
-        salt: bufToB64(newSalt),
-        kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: KDF_ITERATIONS },
-        verifier: await computeVerifier(newKey),
-        blob: await encryptVault(newKey, JSON.stringify(data)),
-        totpSecretEncrypted: rec.totpSecretEncrypted
-          ? await encryptVault(newKey, await decryptVault(oldKey, rec.totpSecretEncrypted))
-          : undefined,
-        passkeys: rec.passkeys?.length
-          ? await Promise.all(rec.passkeys.map((p) => rewrapPasskey(p, newKey)))
-          : [],
-      };
-
-      await saveVaultRecord(nextRecord);
+    setPhase('reencrypting');
+    const result = await changeMasterPassword(current, next);
+    if (result === 'ok') {
       setPhase('done');
-      toast.success('Master password changed — vault re-encrypted');
-
-      // hand the new record to the provider (syncs state + locks) → guard redirects
-      const file = new File([buildExportFile(nextRecord)], 'keyhaven-backup.json', {
-        type: 'application/json',
-      });
-      window.setTimeout(() => void importVault(file), 1600);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Re-encryption failed — vault untouched.');
-      setPhase('idle');
+      toast.success('Master password changed — vault re-encrypted and saved');
+      return;
     }
+    setPhase('idle');
+    setError(
+      result === 'bad-password'
+        ? 'Current password is incorrect.'
+        : result === 'conflict'
+          ? 'The vault was changed in another tab or by an import, so nothing was changed. Unlock again and retry.'
+          : result === 'locked'
+            ? 'The vault locked before the change could be made — nothing was changed.'
+            : "This browser's storage didn't accept the change — your old password still works. Try again.",
+    );
   };
 
   return (
@@ -214,7 +160,9 @@ export default function MasterPasswordCard({
           <CheckCircle2 className="h-5 w-5 shrink-0 text-kh-mint" />
           <div>
             <p className="text-sm font-medium text-kh-primary">Vault re-encrypted with your new password.</p>
-            <p className="mt-0.5 text-xs text-kh-muted">Locking now — unlock with the new password…</p>
+            <p className="mt-0.5 text-xs text-kh-muted">
+              Use it from now on. Backups exported earlier still open with the old password — export a new one.
+            </p>
           </div>
         </motion.div>
       ) : (
@@ -274,8 +222,8 @@ export default function MasterPasswordCard({
                   <div className="flex items-start gap-3 rounded-xl border border-kh-warning/30 bg-kh-warning/5 p-3.5">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kh-warning" />
                     <p className="text-sm leading-6 text-kh-muted">
-                      Your vault is re-encrypted with the new key. This can’t be undone — make sure
-                      you have your recovery codes. Passkeys and your authenticator keep working.
+                      Your vault is re-encrypted with a key from the new password. There is no recovery
+                      if you forget it, so store it safely. Your authenticator keeps working.
                     </p>
                   </div>
 
@@ -286,9 +234,7 @@ export default function MasterPasswordCard({
                       {busy ? (
                         <>
                           <Spinner />
-                          <span className="font-mono text-xs">
-                            {phase === 'verifying' ? 'verifying…' : 're-encrypting…'}
-                          </span>
+                          <span className="font-mono text-xs">re-encrypting…</span>
                         </>
                       ) : (
                         'Re-encrypt & save'

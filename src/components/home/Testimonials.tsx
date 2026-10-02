@@ -23,7 +23,7 @@ const TESTIMONIALS = [
     name: 'Daniel K.',
     role: 'Small-business owner',
     quote:
-      'The Google Authenticator lock sold me. Even if someone took my laptop, they\u2019d get nothing.',
+      'Encrypted backups I can carry between computers sold me. No account, no cloud copy.',
   },
   {
     avatar: '/avatar-priya.png',

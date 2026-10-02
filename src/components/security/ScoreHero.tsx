@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { Check, ChevronRight, Fingerprint, KeyRound, Radar, Smartphone } from 'lucide-react';
+import { Check, ChevronRight, KeyRound, Radar, Smartphone } from 'lucide-react';
 import { Link } from 'react-router';
 import ScoreGauge from './ScoreGauge';
 import type { CheckType, VaultAudit } from './analysis';
@@ -44,13 +44,11 @@ function DrawnCheck({ delay }: { delay: number }) {
 export default function ScoreHero({
   audit,
   totpEnabled,
-  passkeyCount,
   onScrollTo,
   onHighlight,
 }: {
   audit: VaultAudit;
   totpEnabled: boolean;
-  passkeyCount: number;
   onScrollTo: (t: ScrollTarget) => void;
   onHighlight: (c: CheckType | null) => void;
 }) {
@@ -83,20 +81,13 @@ export default function ScoreHero({
     action?: { label: string; onClick: () => void };
     to?: string;
   }[] = [
-    { key: 'master', done: true, icon: KeyRound, label: 'Strong master password' },
+    { key: 'master', done: true, icon: KeyRound, label: 'Master password set' },
     {
       key: 'totp',
       done: totpEnabled,
       icon: Smartphone,
-      label: totpEnabled ? 'Two-factor enabled — authenticator app' : 'Two-factor not enabled yet',
+      label: totpEnabled ? 'Authenticator check enabled' : 'Authenticator check not enabled yet',
       to: totpEnabled ? undefined : '/settings',
-    },
-    {
-      key: 'passkey',
-      done: passkeyCount > 0,
-      icon: Fingerprint,
-      label: passkeyCount > 0 ? `Passkey registered (${passkeyCount})` : 'No passkey registered yet',
-      to: passkeyCount > 0 ? undefined : '/settings',
     },
     {
       key: 'weak',

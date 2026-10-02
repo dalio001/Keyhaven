@@ -1,10 +1,12 @@
 /**
  * KeyHaven crypto core — zero-knowledge, browser-native (WebCrypto only).
  *
- * - Key derivation: PBKDF2-SHA256, 600_000 iterations → AES-GCM 256-bit key.
+ * - Key derivation: PBKDF2-SHA256, 600_000 iterations → NON-extractable
+ *   AES-GCM 256-bit key + a SHA-256 verifier (rejects wrong passwords early).
  * - Vault encryption: AES-GCM (random 12-byte IV per encrypt), payload is
  *   base64(JSON { iv, ct }) so it can be stored as a single opaque string.
  * - NOTHING plaintext is ever persisted — only ciphertext, salt and KDF params.
+ * - The vault key never leaves WebCrypto: there is no raw-key export.
  *
  * All page agents: import from `@/lib/crypto` — signatures are stable.
  */
@@ -155,81 +157,6 @@ export async function openText(key: CryptoKey, envelope: string): Promise<string
   } catch {
     throw new IntegrityError();
   }
-}
-
-/**
- * Derive the AES-GCM 256 vault key from a master password.
- * PBKDF2-SHA256, 600_000 iterations (OWASP 2023 recommendation).
- */
-export async function deriveKey(
-  password: string,
-  salt: Uint8Array,
-  iterations: number = KDF_ITERATIONS,
-): Promise<CryptoKey> {
-  const baseKey = await crypto.subtle.importKey('raw', te.encode(password), 'PBKDF2', false, [
-    'deriveKey',
-  ]);
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', hash: 'SHA-256', salt: salt as BufferSource, iterations },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    true, // extractable — needed for verifier + passkey wrapping
-    ['encrypt', 'decrypt'],
-  );
-}
-
-/** Generate a random AES-GCM 256 key (non-password contexts, e.g. tests). */
-export async function generateAesKey(): Promise<CryptoKey> {
-  return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-}
-
-/** Export an AES key as raw base64 (for passkey wrapping). */
-export async function exportRawKey(key: CryptoKey): Promise<string> {
-  const raw = await crypto.subtle.exportKey('raw', key);
-  return bufToB64(raw);
-}
-
-/** Import a raw base64 AES-GCM key. */
-export async function importRawKey(b64: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', b64ToBuf(b64) as BufferSource, { name: 'AES-GCM' }, true, [
-    'encrypt',
-    'decrypt',
-  ]);
-}
-
-/**
- * A non-reversible verifier for the derived key — stored in the vault record
- * so we can reject a wrong master password without decrypting the blob.
- */
-export async function computeVerifier(key: CryptoKey): Promise<string> {
-  const raw = await crypto.subtle.exportKey('raw', key);
-  const digest = await crypto.subtle.digest('SHA-256', raw);
-  return bufToB64(digest);
-}
-
-/**
- * Encrypt a plaintext string with the vault key.
- * Returns base64 of JSON `{ iv, ct }` (both base64) — a single opaque string.
- */
-export async function encryptVault(key: CryptoKey, plaintext: string): Promise<string> {
-  const iv = randomBytes(IV_BYTES);
-  const ct = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as BufferSource },
-    key,
-    te.encode(plaintext),
-  );
-  return bufToB64(te.encode(JSON.stringify({ iv: bufToB64(iv), ct: bufToB64(ct) })));
-}
-
-/** Decrypt a payload produced by {@link encryptVault}. Throws on wrong key/tampering. */
-export async function decryptVault(key: CryptoKey, payload: string): Promise<string> {
-  const { iv, ct } = JSON.parse(td.decode(b64ToBuf(payload))) as { iv: string; ct: string };
-  const pt = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: b64ToBuf(iv) as BufferSource },
-    key,
-    b64ToBuf(ct) as BufferSource,
-  );
-  return td.decode(pt);
 }
 
 /* ------------------------------------------------------------------ */

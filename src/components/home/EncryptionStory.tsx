@@ -93,7 +93,7 @@ export default function EncryptionStory() {
           {[
             { chip: 0, title: 'You type.', body: 'A password on its own is just text — anyone who reads it, owns it.', content: PLAINTEXT, cls: 'text-kh-primary' },
             { chip: 1, title: 'Your browser encrypts.', body: 'PBKDF2 stretches your master password into a key (600,000 iterations); AES-256-GCM seals every login. It never leaves your device readable.', content: CIPHER, cls: 'text-kh-warning' },
-            { chip: 2, title: 'Only your key opens it.', body: 'Stored as unreadable noise. Unlocked only by you — master password, passkey, or authenticator code.', content: CIPHER, cls: 'text-kh-mint' },
+            { chip: 2, title: 'Only your key opens it.', body: 'Stored as unreadable noise. Opened only with your master password (plus your authenticator check, if enabled).', content: CIPHER, cls: 'text-kh-mint' },
           ].map((p) => (
             <div key={p.title} className="rounded-2xl border border-kh-line bg-kh-inset p-8">
               <StatusChip stage={p.chip} />
@@ -185,7 +185,7 @@ export default function EncryptionStory() {
           {stage === 1 &&
             'Your browser encrypts. PBKDF2 stretches your master password into a key; AES-256-GCM seals every login. It never leaves your device readable.'}
           {stage === 2 &&
-            'Only your key opens it. Stored as unreadable noise. Unlocked only by you — master password, passkey, or authenticator code.'}
+            'Only your key opens it. Stored as unreadable noise. Opened only with your master password (plus your authenticator check, if enabled).'}
         </p>
       </div>
     </section>

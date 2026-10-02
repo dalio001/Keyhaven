@@ -27,6 +27,7 @@ Extra protection: **auto-lock timer**, **clipboard auto-clear** (best effort), a
 ## Features
 
 - **Vault dashboard** — search, categories, favorites, ⌘K command palette, one-click copy with auto-clear, per-login TOTP codes.
+- **Subscriptions & accounts** — track what you pay for (Claude, ChatGPT, Gemini, Wispr Flow or any service): price and currency, monthly / annual / custom billing, next renewal, free trials, canceled-with-access-until, and who bills you (website, Apple, Google Play, other). Each subscription belongs to an account (work and personal accounts stay separate) and can link to a saved login. Encrypted like your logins; nothing is fetched or charged.
 - **Create-vault wizard** — master password → optional authenticator QR → backup codes + "no recovery" acknowledgement, in 3 guided steps.
 - **Watchtower** — security score, weak / reused / old / breached password audit with one-click fixes, offline breach-style scan.
 - **Generator** — passwords, passphrases, PINs with entropy bits + crack-time estimates.
@@ -66,12 +67,13 @@ React 19 · TypeScript · Vite 7 · Tailwind CSS 3.4 · shadcn/ui · Framer Moti
 
 ```
 src/
-  lib/         crypto.ts (PBKDF2+AES-GCM) · totp.ts (RFC 6238) · vault.ts (content model)
+  lib/         crypto.ts (PBKDF2+AES-GCM) · totp.ts (RFC 6238) · vault.ts (content model) · records.ts (accounts & subscriptions)
+  lib/billing/ dates.ts (calendar dates, renewals) · money.ts (minor units, currencies) · status.ts
   lib/store/   format.ts (versioned formats) · codec.ts (seal/open/migrate) · storage.ts (IndexedDB, compare-and-swap)
                controller.ts (unlock, save lifecycle, import/export, tabs) · backupCodes.ts · tabChannel.ts
   providers/   VaultProvider.tsx (React adapter: auto-lock, clipboard clearing, browser events)
-  pages/       Home · Unlock · Vault · Security · Generator · Settings · About
-  components/  ui/ (shadcn) + feature folders (vault, unlock, security, generator, settings, about)
+  pages/       Home · Unlock · Vault · Subscriptions · Security · Generator · Settings · About
+  components/  ui/ (shadcn) + feature folders (vault, subscriptions, unlock, security, generator, settings, about)
 ```
 
 > **Your passwords never leave your device.** Lose your master password and the vault is unrecoverable — by anyone. Backup codes don't change that. Keep the password safe and keep encrypted backups.

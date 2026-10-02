@@ -155,12 +155,14 @@ function MiniGenerator({ onUse }: { onUse: (password: string) => void }) {
 function FormBody({
   mode,
   entry,
+  initialPassword,
   onSave,
   onDelete,
   onValidityChange,
 }: {
   mode: 'add' | 'edit';
   entry: EntryExt | null;
+  initialPassword?: string;
   onSave: (draft: EntryFormDraft) => void;
   onDelete?: (entry: EntryExt) => void;
   onValidityChange: (valid: boolean) => void;
@@ -168,7 +170,7 @@ function FormBody({
   const [title, setTitle] = useState(entry?.title ?? '');
   const [url, setUrl] = useState(entry?.url ?? '');
   const [username, setUsername] = useState(entry?.username ?? '');
-  const [password, setPassword] = useState(entry?.password ?? '');
+  const [password, setPassword] = useState(entry?.password ?? initialPassword ?? '');
   const [category, setCategory] = useState<VaultCategory>(entry?.category ?? 'other');
   const [favorite, setFavorite] = useState(entry?.favorite ?? false);
   const [notes, setNotes] = useState(entry?.notes ?? '');
@@ -574,6 +576,7 @@ export default function EntryFormDrawer({
   open,
   mode,
   entry,
+  initialPassword,
   onClose,
   onSave,
   onDelete,
@@ -581,6 +584,8 @@ export default function EntryFormDrawer({
   open: boolean;
   mode: 'add' | 'edit';
   entry: EntryExt | null;
+  /** add mode: start with this password (e.g. one just generated) */
+  initialPassword?: string;
   onClose: () => void;
   onSave: (draft: EntryFormDraft) => void;
   onDelete?: (entry: EntryExt) => void;
@@ -642,6 +647,7 @@ export default function EntryFormDrawer({
           key={`${mode}-${entry?.id ?? 'new'}`}
           mode={mode}
           entry={entry}
+          initialPassword={mode === 'add' ? initialPassword : undefined}
           onSave={handleSave}
           onDelete={onDelete}
           onValidityChange={setFormValid}

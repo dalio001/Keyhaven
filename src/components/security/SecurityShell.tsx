@@ -191,7 +191,7 @@ export default function SecurityShell({ children }: { children: ReactNode }) {
           </div>
 
           <button
-            onClick={() => navigate('/vault')}
+            onClick={() => navigate('/vault?search=1')}
             className="mx-auto hidden h-10 w-full max-w-[380px] items-center gap-2.5 rounded-xl border border-kh-line bg-kh-inset px-3.5 text-sm text-kh-faint transition-colors hover:border-kh-lineStrong hover:text-kh-muted md:flex"
             aria-label="Search your vault"
           >

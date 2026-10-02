@@ -104,6 +104,47 @@ describe('Subscriptions page', () => {
     expect(await screen.findByText('ChatGPT · Work')).toBeTruthy();
   });
 
+  it('KH-04: a billing date filled in without an input event (autofill, scripts) is saved and shown', async () => {
+    const { c, storage } = await freshVault();
+    renderAt(c, '/subscriptions');
+    const dialog = await openAddForm();
+    fireEvent.click(within(within(dialog).getByRole('radiogroup', { name: 'Service' })).getByRole('radio', { name: 'Custom' }));
+    fill('Service name', 'QA Service');
+    fill('Price', '12.34');
+    fireEvent.click(within(within(dialog).getByRole('radiogroup', { name: 'Billing cycle' })).getByRole('radio', { name: 'Custom' }));
+    fill('Repeat every', '2');
+    fill('Repeat unit', 'week');
+    // set the field the way autofill or a script does: the value changes, no input event fires
+    const date = screen.getByLabelText('Next billing date') as HTMLInputElement;
+    date.value = '2026-10-05';
+    // the page re-renders (e.g. the auto-lock countdown ticks every second) before Save is clicked
+    fill('Plan', 'Team');
+    expect(date.value).toBe('2026-10-05');
+    fireEvent.click(screen.getByRole('button', { name: 'Save subscription' }));
+
+    expect(await screen.findByText('Renews Oct 5, 2026 · in 3 days')).toBeTruthy();
+    await act(() => c.flush());
+    const [sub] = listSubscriptions(await readStoredPayload(storage));
+    expect(sub).toMatchObject({ billingAnchor: '2026-10-05', interval: { unit: 'week', count: 2 }, amountMinor: 1234 });
+
+    // reopening shows the saved date
+    fireEvent.click(screen.getByRole('button', { name: /^Edit QA Service/ }));
+    expect(((await screen.findByLabelText('Next billing date')) as HTMLInputElement).value).toBe('2026-10-05');
+  });
+
+  it('KH-04: a date set without an event and then blurred updates the form before saving', async () => {
+    const { c } = await freshVault();
+    renderAt(c, '/subscriptions');
+    const dialog = await openAddForm();
+    fireEvent.click(within(within(dialog).getByRole('radiogroup', { name: 'Service' })).getByRole('radio', { name: 'Claude' }));
+    fill('Price', '18');
+    const date = screen.getByLabelText('Next billing date') as HTMLInputElement;
+    date.value = '2026-10-05';
+    fireEvent.blur(date);
+    fill('Plan', 'Pro'); // another field re-renders the form: the date must survive
+    expect((screen.getByLabelText('Next billing date') as HTMLInputElement).value).toBe('2026-10-05');
+  });
+
   it('shows what is wrong instead of saving', async () => {
     const { c } = await freshVault();
     renderAt(c, '/subscriptions');

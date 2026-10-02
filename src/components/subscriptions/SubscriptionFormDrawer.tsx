@@ -9,8 +9,8 @@
  * is read (see form-model.ts).
  */
 
-import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import LetterAvatar from '@/components/LetterAvatar';
 import VaultDrawer from '@/components/vault/VaultDrawer';
@@ -60,6 +60,45 @@ function Segmented<T extends string>({
   );
 }
 
+type DateKey = 'billingDate' | 'trialEndsOn' | 'accessEndsOn';
+
+/**
+ * A native date field that keeps what it shows. It is uncontrolled (React sets
+ * the starting value and never overwrites it), so a date filled in without an
+ * input event (browser autofill, extensions, scripts) is not reset by the next
+ * re-render — the vault page re-renders every second for the auto-lock
+ * countdown. Changes reach the draft on input and on blur, and the form
+ * re-reads every date field on submit. Only the string `.value` is used —
+ * never `valueAsDate`.
+ */
+function DateField({
+  id,
+  value,
+  invalid,
+  onValue,
+  inputRef,
+}: {
+  id: string;
+  value: string;
+  invalid: boolean;
+  onValue: (value: string) => void;
+  inputRef: RefObject<HTMLInputElement | null>;
+}) {
+  return (
+    <input
+      id={id}
+      ref={inputRef}
+      type="date"
+      defaultValue={value}
+      onChange={(e) => onValue(e.currentTarget.value)}
+      onBlur={(e) => {
+        if (e.currentTarget.value !== value) onValue(e.currentTarget.value);
+      }}
+      className={cn(inputCls, '[color-scheme:dark]', invalid && 'border-kh-danger/60')}
+    />
+  );
+}
+
 function Field({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn('flex flex-col gap-1.5', className)}>{children}</div>;
 }
@@ -96,6 +135,9 @@ function FormBody({
   const [saveFailed, setSaveFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const currencies = useMemo(() => currencyOptions(), []);
+  const billingInput = useRef<HTMLInputElement>(null);
+  const trialInput = useRef<HTMLInputElement>(null);
+  const accessInput = useRef<HTMLInputElement>(null);
 
   const set = (patch: Partial<SubscriptionDraft>) => {
     const next = { ...d, ...patch };
@@ -142,7 +184,19 @@ function FormBody({
 
   const submit = () => {
     setAttempted(true);
-    const { errors: errs, value } = validateDraft(d, accounts);
+    // what the date fields show is what gets saved, even if it was filled in without an input event
+    const shown: Partial<SubscriptionDraft> = {};
+    const fields: [DateKey, HTMLInputElement | null][] = [
+      ['billingDate', billingInput.current],
+      ['trialEndsOn', trialInput.current],
+      ['accessEndsOn', accessInput.current],
+    ];
+    for (const [key, el] of fields) {
+      if (el && el.value !== d[key]) shown[key] = el.value;
+    }
+    const current = Object.keys(shown).length > 0 ? { ...d, ...shown } : d;
+    if (current !== d) setD(current);
+    const { errors: errs, value } = validateDraft(current, accounts);
     setErrors(errs);
     if (!value) return;
     const ok = onSave(editing ? { ...value, id: editing.id } : value);
@@ -367,12 +421,12 @@ function FormBody({
       {d.status === 'active' && (
         <Field>
           <Label htmlFor="sf-billing">Next billing date</Label>
-          <input
+          <DateField
             id="sf-billing"
-            type="date"
             value={d.billingDate}
-            onChange={(e) => set({ billingDate: e.target.value })}
-            className={cn(inputCls, '[color-scheme:dark]', err('billingDate') && 'border-kh-danger/60')}
+            invalid={!!err('billingDate')}
+            onValue={(v) => set({ billingDate: v })}
+            inputRef={billingInput}
           />
           <p className="text-xs text-kh-faint">Any past or upcoming charge date — later ones are worked out from it.</p>
           <FieldError show={!!err('billingDate')}>{err('billingDate') ?? ''}</FieldError>
@@ -381,12 +435,12 @@ function FormBody({
       {d.status === 'trial' && (
         <Field>
           <Label htmlFor="sf-trial">Trial ends on</Label>
-          <input
+          <DateField
             id="sf-trial"
-            type="date"
             value={d.trialEndsOn}
-            onChange={(e) => set({ trialEndsOn: e.target.value })}
-            className={cn(inputCls, '[color-scheme:dark]', err('trialEndsOn') && 'border-kh-danger/60')}
+            invalid={!!err('trialEndsOn')}
+            onValue={(v) => set({ trialEndsOn: v })}
+            inputRef={trialInput}
           />
           <p className="text-xs text-kh-faint">The first charge, unless you cancel before then.</p>
           <FieldError show={!!err('trialEndsOn')}>{err('trialEndsOn') ?? ''}</FieldError>
@@ -395,12 +449,12 @@ function FormBody({
       {d.status === 'canceled' && (
         <Field>
           <Label htmlFor="sf-access">Paid access until</Label>
-          <input
+          <DateField
             id="sf-access"
-            type="date"
             value={d.accessEndsOn}
-            onChange={(e) => set({ accessEndsOn: e.target.value })}
-            className={cn(inputCls, '[color-scheme:dark]', err('accessEndsOn') && 'border-kh-danger/60')}
+            invalid={!!err('accessEndsOn')}
+            onValue={(v) => set({ accessEndsOn: v })}
+            inputRef={accessInput}
           />
           <p className="text-xs text-kh-faint">Renewal is off. The account and any saved login stay in your vault.</p>
           <FieldError show={!!err('accessEndsOn')}>{err('accessEndsOn') ?? ''}</FieldError>

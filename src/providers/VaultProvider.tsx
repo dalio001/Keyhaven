@@ -34,7 +34,8 @@ import {
 import type { ReactNode } from 'react';
 import { generateTotpSecret, totpUri } from '@/lib/totp';
 import { DEFAULT_SETTINGS } from '@/lib/vault';
-import type { VaultEntry, VaultSettings } from '@/lib/vault';
+import type { Account, Subscription, VaultEntry, VaultSettings } from '@/lib/vault';
+import * as records from '@/lib/records';
 import { cloneSampleEntries } from '@/lib/sampleData';
 import { VaultController } from '@/lib/store/controller';
 import type {
@@ -50,7 +51,7 @@ import type {
   VaultSnapshot,
   VaultStatus,
 } from '@/lib/store/controller';
-import type { MigratedFrom } from '@/lib/store/format';
+import type { MigratedFrom, VaultPayload } from '@/lib/store/format';
 import { createIdbStorage } from '@/lib/store/storage';
 import { createBroadcastTabChannel } from '@/lib/store/tabChannel';
 
@@ -106,6 +107,25 @@ export interface VaultContextValue {
   removeEntry: (id: string) => boolean;
   toggleFavorite: (id: string) => boolean;
   updateSettings: (patch: Partial<VaultSettings>) => boolean;
+
+  /** accounts & subscriptions (empty while locked or before first use) */
+  accounts: Account[];
+  subscriptions: Subscription[];
+  /** false when stored account/subscription data is malformed and edits would risk it */
+  recordsWritable: boolean;
+  /** save a subscription with its account (new or existing) and optional login link, as one change */
+  saveSubscription: (input: SaveSubscriptionInput) => Subscription | null;
+  /** deletes only the subscription — never its account or login */
+  removeSubscription: (id: string) => boolean;
+  /** put back a deleted subscription (undo) */
+  restoreSubscription: (sub: Subscription) => boolean;
+  addAccount: (draft: AccountDraft) => Account | null;
+  updateAccount: (id: string, patch: AccountPatch) => boolean;
+  /** refused while subscriptions use the account; otherwise unlinks (keeps) its logins */
+  removeAccount: (id: string) => 'ok' | 'has-subscriptions' | 'unavailable';
+  /** link a login to an account, or unlink it with null */
+  linkLogin: (entryId: string, accountId: string | null) => boolean;
+
   /** resolves once every change so far is saved (encrypted) in this browser; rejects otherwise */
   flush: () => Promise<void>;
   retrySave: () => void;
@@ -134,12 +154,35 @@ export interface VaultContextValue {
 export type NewEntryDraft = Omit<VaultEntry, 'id' | 'updatedAt' | 'lastUsedAt'> &
   Partial<Pick<VaultEntry, 'id' | 'updatedAt' | 'lastUsedAt'>>;
 
+export type AccountDraft = Omit<Account, 'id' | 'createdAt' | 'updatedAt'>;
+export type AccountPatch = Partial<AccountDraft>;
+/** everything about a subscription the form edits */
+export type SubscriptionFields = Omit<Subscription, 'id' | 'accountId' | 'createdAt' | 'updatedAt'>;
+
+export interface SaveSubscriptionInput {
+  /** the subscription being edited; omit to add one */
+  id?: string;
+  /** an existing account (optionally with changes) or a new one */
+  account: { id: string; patch?: AccountPatch } | { create: AccountDraft };
+  /** link this login to the account */
+  linkEntryId?: string;
+  fields: SubscriptionFields;
+}
+
 const VaultContext = createContext<VaultContextValue | null>(null);
 const NO_ENTRIES: VaultEntry[] = [];
 const NO_CODES: string[] = [];
+const NO_ACCOUNTS: Account[] = [];
+const NO_SUBSCRIPTIONS: Subscription[] = [];
 const MIGRATION_ACK_PREFIX = 'keyhaven:migration-ack:';
 const LEGACY_LOCAL_KEYS = ['keyhaven.trustedDevice'];
 const noop = () => undefined;
+
+function withoutAccountId(e: VaultEntry): VaultEntry {
+  const next = { ...e };
+  delete next.accountId;
+  return next;
+}
 
 function makeId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -180,6 +223,14 @@ export function VaultProvider({
 
   const status = snap.status;
   const settings = snap.data?.settings ?? DEFAULT_SETTINGS;
+  const accounts = useMemo(() => (snap.data ? records.listAccounts(snap.data) : NO_ACCOUNTS), [snap.data]);
+  const subscriptions = useMemo(
+    () => (snap.data ? records.listSubscriptions(snap.data) : NO_SUBSCRIPTIONS),
+    [snap.data],
+  );
+  const recordsWritable = snap.data
+    ? records.canWrite(snap.data, 'accounts') && records.canWrite(snap.data, 'subscriptions')
+    : false;
 
   /* ---------------- boot + browser lifecycle ---------------- */
   useEffect(() => {
@@ -322,7 +373,13 @@ export function VaultProvider({
         updatedAt: draft.updatedAt ?? now,
         lastUsedAt: draft.lastUsedAt ?? now,
       };
-      return controller.mutate((p) => ({ ...p, entries: [entry, ...p.entries] })) ? entry : null;
+      return controller.mutate((p) => {
+        // undo after the login's account was removed: don't restore a dangling link
+        const e = entry.accountId && !records.findAccount(p, entry.accountId) ? withoutAccountId(entry) : entry;
+        return { ...p, entries: [e, ...p.entries] };
+      })
+        ? entry
+        : null;
     },
     [controller],
   );
@@ -354,6 +411,89 @@ export function VaultProvider({
     (patch: Partial<VaultSettings>) =>
       controller.mutate((p) => ({ ...p, settings: { ...p.settings, ...patch } })),
     [controller],
+  );
+
+  /* ---------------- accounts & subscriptions ---------------- */
+  /** apply a pure records operation; false (and no save) when it refuses */
+  const tryMutate = useCallback(
+    (op: (p: VaultPayload) => VaultPayload | null): boolean => {
+      const current = controller.getSnapshot().data;
+      if (!current || op(current) === null) return false;
+      return controller.mutate((p) => op(p) ?? p);
+    },
+    [controller],
+  );
+
+  const saveSubscription = useCallback(
+    (input: SaveSubscriptionInput): Subscription | null => {
+      const current = controller.getSnapshot().data;
+      if (!current) return null;
+      const now = new Date().toISOString();
+      const stored = input.id ? records.listSubscriptions(current).find((x) => x.id === input.id) : undefined;
+      if (input.id && !stored) return null;
+      const newAccount: Account | undefined =
+        'create' in input.account ? { ...input.account.create, id: makeId(), createdAt: now, updatedAt: now } : undefined;
+      const accountId = newAccount ? newAccount.id : 'id' in input.account ? input.account.id : '';
+      const subscription: Subscription = {
+        ...input.fields,
+        id: stored?.id ?? makeId(),
+        accountId,
+        createdAt: stored?.createdAt ?? now,
+        updatedAt: now,
+      };
+      const bundle: records.SubscriptionBundle = {
+        newAccount,
+        accountPatch: 'id' in input.account ? input.account.patch : undefined,
+        linkEntryId: input.linkEntryId,
+        subscription,
+      };
+      return tryMutate((p) => records.saveSubscriptionBundle(p, bundle, now)) ? subscription : null;
+    },
+    [controller, tryMutate],
+  );
+
+  const removeSubscription = useCallback(
+    (id: string) => tryMutate((p) => records.removeSubscription(p, id)),
+    [tryMutate],
+  );
+  const restoreSubscription = useCallback(
+    (sub: Subscription) => tryMutate((p) => records.upsertSubscription(p, sub)),
+    [tryMutate],
+  );
+
+  const addAccount = useCallback(
+    (draft: AccountDraft): Account | null => {
+      const now = new Date().toISOString();
+      const account: Account = { ...draft, id: makeId(), createdAt: now, updatedAt: now };
+      return tryMutate((p) => records.addAccount(p, account)) ? account : null;
+    },
+    [tryMutate],
+  );
+  const updateAccount = useCallback(
+    (id: string, patch: AccountPatch) => {
+      const now = new Date().toISOString();
+      return tryMutate((p) => records.updateAccount(p, id, patch, now));
+    },
+    [tryMutate],
+  );
+  const removeAccount = useCallback(
+    (id: string): 'ok' | 'has-subscriptions' | 'unavailable' => {
+      const current = controller.getSnapshot().data;
+      if (!current) return 'unavailable';
+      const r = records.removeAccount(current, id);
+      if (!r.ok) return r.reason === 'has-subscriptions' ? 'has-subscriptions' : 'unavailable';
+      return tryMutate((p) => {
+        const again = records.removeAccount(p, id);
+        return again.ok ? again.payload : null;
+      })
+        ? 'ok'
+        : 'unavailable';
+    },
+    [controller, tryMutate],
+  );
+  const linkLogin = useCallback(
+    (entryId: string, accountId: string | null) => tryMutate((p) => records.linkLogin(p, entryId, accountId)),
+    [tryMutate],
   );
 
   const flush = useCallback(() => controller.flush(), [controller]);
@@ -426,6 +566,9 @@ export function VaultProvider({
       unavailableDetail: snap.unavailableDetail,
       hasVault: snap.hasVault,
       entries: snap.data?.entries ?? NO_ENTRIES,
+      accounts,
+      subscriptions,
+      recordsWritable,
       settings,
       backupCodes: snap.data?.recoveryCodes ?? NO_CODES,
       totpEnabled: snap.totpEnabled,
@@ -452,6 +595,13 @@ export function VaultProvider({
       removeEntry,
       toggleFavorite,
       updateSettings,
+      saveSubscription,
+      removeSubscription,
+      restoreSubscription,
+      addAccount,
+      updateAccount,
+      removeAccount,
+      linkLogin,
       flush,
       retrySave,
       discardUnsaved,
@@ -476,7 +626,8 @@ export function VaultProvider({
       retryStorage, addEntry, updateEntry, removeEntry, toggleFavorite, updateSettings, flush, retrySave,
       discardUnsaved, unsavedBackupText, beginTotpEnrollment, confirmTotpEnrollment, cancelTotpEnrollment,
       disableTotp, regenerateBackupCodes, changeMasterPassword, copyWithAutoClear, exportBackup, importBackup,
-      restorePreviousVault, discardPreviousVault, destroyVault,
+      restorePreviousVault, discardPreviousVault, destroyVault, accounts, subscriptions, recordsWritable,
+      saveSubscription, removeSubscription, restoreSubscription, addAccount, updateAccount, removeAccount, linkLogin,
     ],
   );
 

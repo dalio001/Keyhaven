@@ -117,6 +117,25 @@ describe('parsePayload', () => {
     expect(p.recoveryCodes).toEqual([]);
   });
 
+  it('accounts and subscriptions round-trip byte-identically, unknown fields included', () => {
+    const payload = {
+      entries: [{ id: 'e1', title: 'x', accountId: 'a1' }],
+      settings: { autoLockMinutes: 5, clipboardClearSeconds: 20, remaskSeconds: 15 },
+      recoveryCodes: [],
+      accounts: [{ id: 'a1', service: 'Claude', category: 'work', futureField: [1, 2] }],
+      subscriptions: [{ id: 's1', accountId: 'a1', billingAnchor: '2028-02-29', amountMinor: 2000, currency: 'USD' }],
+    };
+    const json = JSON.stringify(payload);
+    expect(serializePayload(parsePayload(json))).toBe(json);
+  });
+
+  it('malformed account/subscription collections never make the vault unopenable', () => {
+    for (const bad of ['"text"', '{"a":1}', '[null,7,{"no":"id"}]', 'null']) {
+      const json = `{"entries":[],"settings":{"autoLockMinutes":5,"clipboardClearSeconds":20,"remaskSeconds":15},"recoveryCodes":[],"accounts":${bad},"subscriptions":${bad}}`;
+      expect(serializePayload(parsePayload(json))).toBe(json); // opened, and kept verbatim
+    }
+  });
+
   it('rejects structurally broken payloads', () => {
     expect(codeOf(() => parsePayload('[]'))).toBe('invalid');
     expect(codeOf(() => parsePayload('{"entries":[{"title":"no id"}]}'))).toBe('invalid');

@@ -21,6 +21,7 @@ import EntryFormDrawer from '@/components/vault/EntryFormDrawer';
 import type { EntryFormDraft } from '@/components/vault/EntryFormDrawer';
 import { VAULT_LINK_PARAMS, hasVaultLinkParams, parseVaultLink } from '@/components/vault/deep-link';
 import { clearSecret, peekSecret } from '@/lib/handoff';
+import { loadIgnored } from '@/components/security/analysis';
 import EntryList from '@/components/vault/EntryList';
 import FilterBar from '@/components/vault/FilterBar';
 import StatsStrip from '@/components/vault/StatsStrip';
@@ -123,7 +124,9 @@ function VaultDashboard() {
   /* ---------- derived data ---------- */
   const strength = useMemo(() => buildStrengthMap(entries), [entries]);
   const reused = useMemo(() => reusedPasswords(entries), [entries]);
-  const stats = useMemo(() => computeStats(entries, strength), [entries, strength]);
+  // checks the user chose to ignore in Watchtower count the same here (KH-07)
+  const [ignored] = useState(() => loadIgnored());
+  const stats = useMemo(() => computeStats(entries, strength, ignored), [entries, strength, ignored]);
 
   const counts = useMemo(() => {
     const perCategory = Object.fromEntries(

@@ -108,7 +108,19 @@ export function monthsAgo(iso: string): number {
   return Math.max(0, Math.round((Date.now() - t) / (30.44 * 86_400_000)));
 }
 
-export function analyzeVault(entries: VaultEntry[], ignored: Set<string>): VaultAudit {
+/** zxcvbn results already measured elsewhere (the vault page's strength map), by entry id */
+export type KnownStrengths = ReadonlyMap<string, { score: number; crackTime: string }>;
+
+function measure(password: string): { score: number; crackTime: string } {
+  const r = zxcvbn(password || '');
+  return { score: r.score, crackTime: r.crack_times_display.offline_slow_hashing_1e5_per_second };
+}
+
+/**
+ * The one security score: Watchtower and the vault dashboard both show this
+ * (KH-07). Pass `known` to reuse strengths that were already measured.
+ */
+export function analyzeVault(entries: VaultEntry[], ignored: Set<string>, known?: KnownStrengths): VaultAudit {
   // reuse clusters on the raw password (exact duplicates)
   const byPassword = new Map<string, VaultEntry[]>();
   for (const e of entries) {
@@ -121,14 +133,14 @@ export function analyzeVault(entries: VaultEntry[], ignored: Set<string>): Vault
   reuseClusters.forEach((cluster, i) => cluster.forEach((e) => reuseIndex.set(e.id, i)));
 
   const audits: EntryAudit[] = entries.map((entry) => {
-    const result = zxcvbn(entry.password || '');
+    const result = known?.get(entry.id) ?? measure(entry.password);
     const age = monthsAgo(entry.updatedAt);
     const reuseGroup = reuseIndex.get(entry.id) ?? null;
     const updatedMs = Date.parse(entry.updatedAt);
     return {
       entry,
       strength: result.score,
-      crackTime: result.crack_times_display.offline_slow_hashing_1e5_per_second,
+      crackTime: result.crackTime,
       weak: result.score <= 1,
       reused: reuseGroup !== null,
       reuseGroup,

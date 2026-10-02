@@ -49,12 +49,10 @@ export function subscriptionState(sub: Subscription, today: CalendarDate): Subsc
     return at('trial', sub.trialEndsOn);
   }
   if (sub.status !== 'active' && sub.status !== 'trial') problems.push('status');
-  // active — or a trial that is over, which renews from its end date unless a billing date was given
-  const anchor = isCalendarDate(sub.billingAnchor)
-    ? sub.billingAnchor
-    : sub.status === 'trial' && isCalendarDate(sub.trialEndsOn)
-      ? sub.trialEndsOn
-      : null;
+  // active: renews from the billing date. A trial that is over renews from its end date (the first
+  // charge), even if an older billing date is stored; the billing date is only a fallback there.
+  const trialAnchor = sub.status === 'trial' && isCalendarDate(sub.trialEndsOn) ? sub.trialEndsOn : null;
+  const anchor = trialAnchor ?? (isCalendarDate(sub.billingAnchor) ? sub.billingAnchor : null);
   return at('renews', anchor && isValidInterval(sub.interval) ? nextOnOrAfter(anchor, sub.interval, today) : null);
 }
 

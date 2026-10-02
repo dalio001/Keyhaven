@@ -192,7 +192,8 @@ export function validateDraft(
     interval: { unit, count },
     status: d.status,
     provider: d.provider,
-    ...(d.billingDate ? { billingAnchor: d.billingDate } : {}),
+    // a trial's first charge is its end date; a billing date hidden by switching to "Free trial" is dropped
+    ...(d.billingDate && d.status !== 'trial' ? { billingAnchor: d.billingDate } : {}),
     ...(d.status === 'trial' ? { trialEndsOn: d.trialEndsOn } : {}),
     ...(d.status === 'canceled' && d.accessEndsOn ? { accessEndsOn: d.accessEndsOn } : {}),
     ...(d.provider === 'other' ? { providerOther: d.providerOther.trim() } : {}),

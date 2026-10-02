@@ -62,6 +62,14 @@ describe('records: reading', () => {
     const p = payload({ accounts: [account('a1'), null, 42, { service: 'no id' }, { id: 7 }] });
     expect(listAccounts(p).map((a) => a.id)).toEqual(['a1']);
   });
+
+  it('accounts without a text service name, or with non-text fields, are hidden but kept verbatim', () => {
+    const odd = [{ id: 'no-service' }, { id: 'num-service', service: 7 }, { id: 'num-email', service: 'X', email: 5 }];
+    const p = payload({ accounts: [...odd, account('a1')] });
+    expect(listAccounts(p).map((a) => a.id)).toEqual(['a1']);
+    expect(upsertSubscription(p, sub('s1', 'no-service'))).toBeNull(); // can't attach to a hidden account
+    expect(addAccount(p, account('a2'))!.accounts).toEqual([...odd, account('a1'), account('a2')]);
+  });
 });
 
 describe('records: accounts', () => {

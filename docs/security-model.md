@@ -240,8 +240,11 @@ All persistence goes through one controller (`src/lib/store/controller.ts`). It 
 - Accounts and subscriptions did **not** need a new record version. The Phase-1 build already preserves
   unknown payload keys and login fields, so editing or deleting logins there keeps them intact (tested in a
   real browser on the same origin). A version bump would have locked older tabs out of the whole vault.
-  If the stored account or subscription data is ever malformed, it is kept verbatim and editing it is
-  turned off; the vault still opens.
+  Malformed account or subscription data never stops the vault from opening and is never discarded:
+  - An item KeyHaven can't use is hidden from the lists and carried through every save verbatim. An item is
+    unusable if it has no text `id`, or is an account without a text service name or with non-text fields.
+  - A collection that isn't a list is kept as is, and editing it is turned off.
+  - A subscription whose account is hidden shows as "Unknown account" and can be moved to another account.
 
 ### How a legacy vault is migrated
 

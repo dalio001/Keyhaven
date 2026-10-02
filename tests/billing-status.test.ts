@@ -47,6 +47,12 @@ describe('subscription state (derived, never stored)', () => {
     });
   });
 
+  it('an expired trial renews from its trial end, even if an older billing date is stored', () => {
+    expect(
+      subscriptionState(sub({ status: 'trial', trialEndsOn: '2026-09-20', billingAnchor: '2026-08-03' }), TODAY),
+    ).toMatchObject({ kind: 'renews', date: '2026-10-20' });
+  });
+
   it('canceled: access until the end date, then ended', () => {
     expect(subscriptionState(sub({ status: 'canceled', accessEndsOn: '2026-10-31' }), TODAY)).toMatchObject({
       kind: 'access-until',

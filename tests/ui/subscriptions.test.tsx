@@ -133,6 +133,29 @@ describe('Subscriptions page', () => {
   });
 });
 
+describe('malformed stored accounts', () => {
+  it('the Accounts and Subscriptions tabs still render; the unusable account is hidden', async () => {
+    const { c } = await freshVault();
+    const NOW = '2026-10-02T12:00:00.000Z';
+    c.mutate((p) => ({
+      ...p,
+      accounts: [
+        { id: 'broken' }, // no service name
+        { id: 'odd', service: 'Odd', email: 42 },
+        { id: 'ok', service: 'Synthetic Cloud', category: 'other', createdAt: NOW, updatedAt: NOW },
+      ],
+      subscriptions: [
+        { id: 's1', accountId: 'broken', plan: '', amountMinor: 500, currency: 'USD', interval: { unit: 'month', count: 1 }, status: 'active', provider: 'website', createdAt: NOW, updatedAt: NOW },
+      ],
+    }));
+    renderAt(c, '/subscriptions?tab=accounts');
+    expect(await screen.findByRole('button', { name: 'Edit account Synthetic Cloud' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Accounts (1)' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /Subscriptions/ }));
+    expect(await screen.findByRole('button', { name: /^Edit Unknown account/ })).toBeTruthy();
+  });
+});
+
 describe('date fields stay strings end to end', () => {
   const ORIGINAL_TZ = process.env.TZ;
   const RealDate = globalThis.Date;
@@ -180,15 +203,23 @@ describe('date fields stay strings end to end', () => {
       await screen.findByRole('button', { name: /^Edit Claude/ });
       await act(() => c.flush());
 
-      const [sub] = listSubscriptions(await readStoredPayload(storage));
-      expect(sub.billingAnchor).toBe('2027-01-31');
+      let [sub] = listSubscriptions(await readStoredPayload(storage));
       expect(sub.trialEndsOn).toBe('2026-12-31');
+      expect(sub.billingAnchor).toBeUndefined(); // the billing date hidden by "Free trial" is not saved
 
-      // the edit form shows the same strings back
+      // the edit form shows the same string back; switching to Active stores the newly typed day
       fireEvent.click(screen.getByRole('button', { name: /^Edit Claude/ }));
       expect((await screen.findByLabelText('Trial ends on') as HTMLInputElement).value).toBe('2026-12-31');
       fireEvent.click(screen.getByRole('radio', { name: 'Active' }));
-      expect((screen.getByLabelText('Next billing date') as HTMLInputElement).value).toBe('2027-01-31');
+      fill('Next billing date', '2027-01-31');
+      fireEvent.click(screen.getByRole('button', { name: 'Save subscription' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await act(() => c.flush());
+      [sub] = listSubscriptions(await readStoredPayload(storage));
+      expect(sub).toMatchObject({ status: 'active', billingAnchor: '2027-01-31' });
+      expect(sub.trialEndsOn).toBeUndefined();
+      fireEvent.click(screen.getByRole('button', { name: /^Edit Claude/ }));
+      expect((await screen.findByLabelText('Next billing date') as HTMLInputElement).value).toBe('2027-01-31');
 
       expect(parsed).toEqual([]);
     },

@@ -63,6 +63,15 @@ describe('subscription form model', () => {
     expect(draftFromSubscription(sub, work).billingDate).toBe('2028-02-29');
   });
 
+  it('a trial does not save the billing date hidden by switching to "Free trial"', () => {
+    const v = validateDraft(draft({ billingDate: '2027-01-31', status: 'trial', trialEndsOn: '2026-12-31' }), ACCOUNTS).value!;
+    expect(v.fields.trialEndsOn).toBe('2026-12-31');
+    expect('billingAnchor' in v.fields).toBe(false);
+    // a canceled subscription keeps it (renewal is off, but the history is still useful)
+    const c = validateDraft(draft({ billingDate: '2027-01-31', status: 'canceled' }), ACCOUNTS).value!;
+    expect(c.fields.billingAnchor).toBe('2027-01-31');
+  });
+
   it('refuses dates that are not real days', () => {
     expect(validateDraft(draft({ billingDate: '2027-02-29' }), ACCOUNTS).errors.billingDate).toBeTruthy();
     expect(validateDraft(draft({ status: 'trial', trialEndsOn: '' }), ACCOUNTS).errors.trialEndsOn).toBe('When does the trial end?');

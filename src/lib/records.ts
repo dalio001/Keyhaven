@@ -5,8 +5,9 @@
  * Rules (see docs/security-model.md, "Accounts and subscriptions"):
  * - The collections are optional; reading an absent one gives `[]`, and nothing
  *   is written until the user creates something.
- * - Malformed items (not an object with a string `id`) are hidden from lists
- *   and carried through every save verbatim. A collection that is present but
+ * - Malformed items (not an object with a string `id`; for accounts also a
+ *   text `service` and text optional fields) are hidden from lists and
+ *   carried through every save verbatim. A collection that is present but
  *   not an array is never overwritten: changes to it are refused.
  * - Links live on the child (`entry.accountId`, `subscription.accountId`).
  *   Removing a subscription never touches a login; removing a login leaves its
@@ -26,6 +27,12 @@ type Item = { id: string } & Record<string, unknown>;
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 const isItem = (v: unknown): v is Item => isObject(v) && typeof v.id === 'string';
+const ACCOUNT_TEXT_FIELDS = ['serviceKey', 'label', 'email', 'website', 'notes'] as const;
+/** an account the UI can show: a text service name, and text (or absent) optional fields */
+const isAccount = (v: unknown): v is Item =>
+  isItem(v) &&
+  typeof v.service === 'string' &&
+  ACCOUNT_TEXT_FIELDS.every((k) => v[k] === undefined || typeof v[k] === 'string');
 
 /** the stored collection (malformed items included); `[]` when absent; `null` when unusable */
 function rawList(p: VaultPayload, key: CollectionKey): unknown[] | null {
@@ -39,8 +46,9 @@ export function canWrite(p: VaultPayload, key: CollectionKey): boolean {
   return rawList(p, key) !== null;
 }
 
+/** usable accounts; anything else is hidden here and carried through every save verbatim */
 export function listAccounts(p: VaultPayload): Account[] {
-  return (rawList(p, 'accounts') ?? []).filter(isItem) as unknown as Account[];
+  return (rawList(p, 'accounts') ?? []).filter(isAccount) as unknown as Account[];
 }
 
 export function listSubscriptions(p: VaultPayload): Subscription[] {

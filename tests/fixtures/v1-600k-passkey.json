@@ -1,0 +1,81 @@
+{
+  "password": "synthetic-Correct-Horse-7731",
+  "payload": {
+    "entries": [
+      {
+        "id": "e-0001",
+        "title": "Example Mail",
+        "url": "https://mail.example.test",
+        "username": "tester@example.test",
+        "password": "synthetic-pw-Alpha-1!",
+        "category": "work",
+        "favorite": true,
+        "notes": "synthetic fixture entry",
+        "totp": true,
+        "totpSecret": "KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TFOQ",
+        "updatedAt": "2026-01-02T03:04:05.000Z",
+        "lastUsedAt": "2026-01-02T03:04:05.000Z",
+        "passwordHistory": [
+          {
+            "password": "synthetic-old-pw-0",
+            "changedAt": "2025-12-01T00:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "e-0002",
+        "title": "Example Stream",
+        "url": "https://stream.example.test",
+        "username": "viewer",
+        "password": "synthetic-pw-Beta-2?",
+        "category": "streaming",
+        "favorite": false,
+        "updatedAt": "2026-02-03T04:05:06.000Z",
+        "lastUsedAt": "2026-02-03T04:05:06.000Z",
+        "breached": false
+      }
+    ],
+    "settings": {
+      "autoLockMinutes": 7,
+      "clipboardClearSeconds": 25,
+      "remaskSeconds": 15
+    },
+    "recoveryCodes": [
+      "ABCD-EFGH-JKMN",
+      "PQRS-TUVW-XYZ2",
+      "3456-789A-BCDE",
+      "FGHJ-KMNP-QRST",
+      "UVWX-YZ23-4567",
+      "89AB-CDEF-GHJK",
+      "MNPQ-RSTU-VWXY",
+      "Z234-5678-9ABC"
+    ],
+    "futureField": {
+      "note": "unknown payload key that must survive round-trips"
+    }
+  },
+  "generatedFrom": "src/lib/crypto.ts @ 22d71d3 (pre-Phase-1); synthetic data only",
+  "totpSecret": null,
+  "record": {
+    "version": 1,
+    "salt": "puHJ29WlFQJm4BWeq+ficA==",
+    "kdf": {
+      "name": "PBKDF2",
+      "hash": "SHA-256",
+      "iterations": 600000
+    },
+    "verifier": "MA6bQxZFKEgsVvUexEWsMVuPfgSH/yUUDBgSfSll350=",
+    "blob": "eyJpdiI6IkxkcmZTbE8xNjg0aWVUSnIiLCJjdCI6Im1yQUl2L2lvSHh0RkNxc3NMNVVzTVh6c1MyY1dEejRsNjExOGhJZkhkV3ZodWQvYm0zcWJLUjdQWG8rMmt5eDVSdmZmWVJkZE85VlJPVFpMS1BWNjRLREVqa0hibjY4bGVGVUR6MU1zOXA3SEc0YXowR1JjV2FIYmxyM1FWUnIwUHNCM3lWZm5nWUFRYjRaRDFRK3dkR2RlSXVNVDZubWJnU1owWEppVThJZUdzQ3Iyc3JZWTNmenZxWEQzK0paa0ZVQW5PdmcwNklHVjVWNTRjN3U2ZVhXTHd6ek4rc2lYRFVRSHhZQmI3Z0FiMnNONW5ia25BZ1A0NDA1KzJORVgweUJ2SDdWMGJWRnRyYXFnY0NaRkFhS25LQTc3NHNwOUZzWWQ5SFZXci9jb3M2c3I1NkNpOTVYVm8vZG4zcElpRWNaWHF1bkR5T1JLc1FNU0g2ZE1SdHdwT1JtamtGVi9MV0Z5RUtveDBEQi9IY0YyS3p3cVJjL1luM2Y4elo0bnIxV3EydEVEWkF4eG1SRS94dlhjU1V2YW4rWEJra0NuTFdRcHlKT21lbHArNm5BMEpTR3pDR09GdHRsODU5a004ZTVoK09nY3FZRXlJaGdJYitQUFlXVkxhVmZYb2lMeTV1MkVYQVNaZTU3eTNKT3lLU09GODlsekRGcFFnUThveXF3WnA1T0tJUEZUYmg4UHUxck5GSThnc1llNkhhaklna04zY1J2dHRnZmtyQU5kV0Q0Qmw5cC9KR2NzOW5pa1ZvQUJOZWRxUGxjTHR6MW1nekYyZ0tHU2c0cE4wOEJMWlpmZmIvcDRWRlZLdXppZ2dTRUxHS2VyNmdJbXBvMkk1ZTgzb0E1MzNJUGd1dkc4Yk5SOEZwVk40bU9aNVZpTW83WGxuZDU3UUxYbkJlN1A2c1l3VXlNNldSc2RpdmZ4bEx3dkJmM3M1R2ZpcWNuMUoyS2xVM2Y0bWo0a0J0OXdpNGExUG5xK2lkQUc3eHFVd2JYd0IzNWJKZ3BsT1dyN1I1c3QxZkJWR2tzOGN1M0NsUkZwaHd5QVdDT0sxOHJPZHo4d0hmcTBVc2JpWEd3Mmp6dG5yYjl5UW9uTE0xVXZSSDAzN1VGMHgwQVh6UVZLdDY0L1V5YWZ1elpzRDFkTmdIdXAwWlIzUXNMWE9LNktkNUQ0a0pNRHBSc0FJeGlTUnd0dzJwTjQ4WHZ5WWFFcXA3YjB4aitpcHZUcUtSTU1VOGRHai9ENnJicFhnQjJCZzlpcmxzN3E2M0RkZlFwZnVUeGFHZ1lPNm1SNzQxaTh3VkFMVVpTV0RRUU1CdWRqNUNFUHMxcjllaE5lYW1mZjB5YXlJUXhFdENXUzFYb0Nibi9PZ0FETkhhUkRDMHlKcWNiQ1NPaTZ1cE1qbnRIRFdsSTRKUi9nSnpkbHpHeWdwcXNHeWRjN2EwSjJFWFhlN1pnTkd3cy9jUDhNNllkSGdvK1g2SmhDMS9uQXVMSm5IMU0ydDBUOWdxMmpjRFdpdkRhK05NeUMvbXp4dk9Ia1hWK0VEbGZ0S0IySy9rYy9WZG9JRElKNzQ5cjBsUXhnU0JrQmNpRDBsdEdGaENFUFZHenhlTmszdjg3amNVR0tDb3NFakxnL0R1eHlzSTVUWm1ZNXZsaW5WQ3gzRGZkdG5xNGt6V2ZxcDBUclM1a1Q0bWtrWEcwNUpsNVdtaTkrZisvOVFEdVFPWjJQRHUrS1VJQ1FUc2RnS0ZlaTlkN3RtWVlPMDJFeXBDK0hTTWpUVFlOMWRwWUJwT1JNMlU0bnJXOXBQWml4WkdISGUxYTR3NjhCR084MmNwWHRIQnkzYUhrTHBRWm5aZUR0WXFDSHI5TXMifQ==",
+    "passkeys": [
+      {
+        "credentialId": "AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw=",
+        "wrappedKey": "eyJpdiI6Im9JSWF4ckt6dEswNTk0SzAiLCJjdCI6IjliMlRoRmpqRzcwYm5Pa1hsTmNBMklteUp1aVdDS04xVVF0bXYrdmZpU3RMU1NtcDdNcjdKNFlPaVVHcTRoWlozNXI2VlhmWVM2QmtDNy94In0=",
+        "salt": "zl6EI/g9GgY3RZE18Kf8gg==",
+        "name": "Synthetic test passkey",
+        "createdAt": "2026-03-04T05:06:07.000Z"
+      }
+    ],
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-03-04T05:06:07.000Z"
+  }
+}

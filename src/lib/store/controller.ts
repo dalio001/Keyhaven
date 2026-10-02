@@ -1024,6 +1024,21 @@ export class VaultController {
       (this.phase === 'unavailable' && this.unavailableReason === 'invalid-record');
     if (!allowed) return { ok: false, reason: 'not-allowed' };
 
+    // Snapshot what this import is meant to replace BEFORE the slow verification.
+    // If the vault is deleted, replaced or restored meanwhile (here or in
+    // another tab), the import is cancelled instead of re-creating a vault.
+    const e0 = this.epoch;
+    const startedUnlocked = this.phase === 'unlocked';
+    const startVaultId = this.committed?.vaultId ?? null;
+    let startExpected: unknown = undefined; // no-vault: nothing may appear meanwhile
+    if (this.phase === 'unavailable') {
+      try {
+        startExpected = await this.storage.readCurrent(); // the unreadable record being replaced
+      } catch {
+        return { ok: false, reason: 'storage-error' };
+      }
+    }
+
     let rec: AnyVaultRecord;
     try {
       rec = parseBackupFile(text).record;
@@ -1062,22 +1077,21 @@ export class VaultController {
       }
 
       return await this.mutex.run(async (): Promise<ImportResult> => {
-        let expected: unknown;
-        if (this.phase === 'unlocked' || this.phase === 'locking') {
-          try {
-            await this.writePendingLocked();
-          } catch {
-            return { ok: false, reason: 'current-unsaved' };
+        if (this.epoch !== e0) return { ok: false, reason: 'conflict' }; // deleted/replaced/restored here
+        let expected: unknown = startExpected;
+        if (startedUnlocked) {
+          if (this.seq > this.committedSeq) {
+            try {
+              await this.writePendingLocked();
+            } catch {
+              return { ok: false, reason: 'current-unsaved' };
+            }
           }
-          expected = this.committed ?? undefined;
-        } else {
-          try {
-            expected = await this.storage.readCurrent();
-          } catch {
-            return { ok: false, reason: 'storage-error' };
-          }
-          if (this.phase === 'no-vault' && expected !== undefined) return { ok: false, reason: 'conflict' };
+          // still the same vault lineage this tab had open? (another tab may have deleted it)
+          if (!this.committed || this.committed.vaultId !== startVaultId) return { ok: false, reason: 'conflict' };
+          expected = this.committed;
         }
+        // compare-and-swap against that starting state: anything else → conflict, nothing replaced
         try {
           await this.storage.replace(next, expected);
         } catch (err) {

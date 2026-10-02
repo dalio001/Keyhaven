@@ -10,6 +10,9 @@
  *   uses request callbacks only (an `await` inside would auto-commit it).
  *   Writes resolve on `complete` with `durability: 'strict'`, so a record is
  *   either fully the old one or fully the new one.
+ * - Outcomes are definitive: a timed-out operation aborts its transaction
+ *   (so a rejected write can never land later); if it is already committing,
+ *   the real outcome is awaited instead.
  * - Records are stored as given; this layer never edits them (except to strip
  *   legacy passkey wraps from a record moved into the `previous` slot).
  */
@@ -176,10 +179,12 @@ export function createIdbStorage(opts: IdbStorageOptions = {}): VaultStorage {
     what: string,
     body: (store: IDBObjectStore, ctl: TxControl, setResult: (v: T) => void) => void,
   ): Promise<T> {
+    // Opening never writes, so an open timeout is a definitive "nothing happened".
     const db = await withTimeout(getDb(), timeoutMs, 'open');
-    const op = new Promise<T>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       let failure: Error | null = null;
       let result: T | undefined;
+      let settled = false;
       let tx: IDBTransaction;
       try {
         tx = db.transaction(STORE, mode, { durability: 'strict' });
@@ -187,6 +192,24 @@ export function createIdbStorage(opts: IdbStorageOptions = {}): VaultStorage {
         reject(mapDomError(err, `Browser storage refused the ${what}.`));
         return;
       }
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      };
+      // A timeout must never leave the outcome ambiguous: abort the transaction.
+      // If abort() succeeds, nothing in it can commit any more, so rejecting is
+      // definitive. If it throws, the transaction is already committing or
+      // finished — wait for its real outcome instead of guessing.
+      const timer = setTimeout(() => {
+        try {
+          tx.abort();
+        } catch {
+          return;
+        }
+        settle(() => reject(new StorageError('timeout', `Browser storage did not respond (${what}); nothing was changed.`)));
+      }, timeoutMs);
       const ctl: TxControl = {
         fail(err) {
           failure = err;
@@ -197,8 +220,8 @@ export function createIdbStorage(opts: IdbStorageOptions = {}): VaultStorage {
           }
         },
       };
-      tx.oncomplete = () => (failure ? reject(failure) : resolve(result as T));
-      tx.onabort = () => reject(failure ?? mapDomError(tx.error, `Browser storage aborted the ${what}.`));
+      tx.oncomplete = () => settle(() => (failure ? reject(failure) : resolve(result as T)));
+      tx.onabort = () => settle(() => reject(failure ?? mapDomError(tx.error, `Browser storage aborted the ${what}.`)));
       try {
         body(tx.objectStore(STORE), ctl, (v) => {
           result = v;
@@ -207,7 +230,6 @@ export function createIdbStorage(opts: IdbStorageOptions = {}): VaultStorage {
         ctl.fail(err instanceof Error ? err : mapDomError(err, `The ${what} failed.`));
       }
     });
-    return withTimeout(op, timeoutMs, what);
   }
 
   function readKey(key: string): Promise<unknown> {

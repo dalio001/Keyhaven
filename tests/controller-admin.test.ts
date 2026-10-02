@@ -5,7 +5,7 @@ import { parseStoredRecord, serializeBackupFile } from '@/lib/store/format';
 import type { VaultRecordV2 } from '@/lib/store/format';
 import { fixtures } from './helpers/fixtures';
 import { FaultyStorage, seedRaw } from './helpers/faultyStorage';
-import { PW, addEntry, entry, freshVault, makeController, readStoredPayload, started } from './helpers/controller';
+import { PW, addEntry, entry, freshVault, makeController, memoryHub, readStoredPayload, started, until } from './helpers/controller';
 
 async function exportText(c: Awaited<ReturnType<typeof freshVault>>['c']): Promise<string> {
   const r = await c.exportBackup();
@@ -102,6 +102,39 @@ describe('import (restore an encrypted backup)', () => {
     expect(device.c.getSnapshot().status).toBe('no-vault');
     expect(await device.c.importBackup(text, PW)).toMatchObject({ ok: true, unlocked: true });
     expect(device.c.getSnapshot().data?.entries.map((e) => e.id)).toEqual(['portable']);
+  });
+});
+
+describe('import racing a deletion', () => {
+  // the 600k-iteration legacy fixture keeps verification + migration busy long
+  // enough for a deletion to happen in between
+  const slowBackup = () => {
+    const fx = fixtures.passkey600k();
+    return { fx, text: JSON.stringify({ app: 'keyhaven', kind: 'encrypted-vault-export', version: 1, record: fx.record }) };
+  };
+
+  it('a deletion in this tab while the backup is being verified cancels the import', async () => {
+    const { c, storage } = await freshVault();
+    const { fx, text } = slowBackup();
+    const importing = c.importBackup(text, fx.password);
+    await c.destroy();
+    expect(await importing).toMatchObject({ ok: false, reason: 'conflict' });
+    expect(await storage.inner.readCurrent()).toBeUndefined();
+    expect(c.getSnapshot().status).toBe('no-vault');
+  });
+
+  it('a deletion in another tab while the backup is being verified cancels the import', async () => {
+    const hub = memoryHub();
+    const factory = new IDBFactory();
+    const a = await freshVault({ storage: new FaultyStorage(factory), channel: hub.channel(), tabId: 'tab-a' });
+    const b = makeController({ storage: new FaultyStorage(factory), channel: hub.channel(), tabId: 'tab-b' });
+    await b.c.start();
+    const { fx, text } = slowBackup();
+    const importing = a.c.importBackup(text, fx.password);
+    await b.c.destroy();
+    await until(() => a.c.getSnapshot().status === 'no-vault');
+    expect(await importing).toMatchObject({ ok: false, reason: 'conflict' });
+    expect(await a.storage.inner.readCurrent()).toBeUndefined();
   });
 });
 

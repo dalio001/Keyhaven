@@ -117,6 +117,7 @@ export default function CreateWizard({
   const [totpError, setTotpError] = useState<string | null>(null);
   const [totpShake, setTotpShake] = useState(0);
   const [enrolled, setEnrolled] = useState(false);
+  const [enrollSaveWarning, setEnrollSaveWarning] = useState(false);
   const [manual, setManual] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
 
@@ -168,6 +169,9 @@ export default function CreateWizard({
 
   /* ---------------- step 2 ---------------- */
   const chooseTotp = (c: 'app' | 'skip') => {
+    // once a code was accepted the authenticator is on (it can be turned off
+    // later in Settings with a code) — "Skip" would not undo it, so lock the choice
+    if (enrolled) return;
     setTotpChoice(c);
     setTotpError(null);
     if (c === 'app') {
@@ -186,16 +190,16 @@ export default function CreateWizard({
     setTotpError(null);
     const result = await confirmTotpEnrollment(code);
     setTotpBusy(false);
-    if (result === 'ok') {
+    if (result === 'ok' || result === 'save-failed') {
+      // 'save-failed': the code was accepted and the authenticator is already
+      // enabled in memory; the save is being retried — so it IS enrolled and the
+      // backup codes must be shown in the next step
       setEnrolled(true);
+      setEnrollSaveWarning(result === 'save-failed');
     } else {
       setTotpShake((k) => k + 1);
       setTotpCode('');
-      setTotpError(
-        result === 'save-failed'
-          ? "The code was right, but this browser didn't save the change yet — KeyHaven keeps retrying. Check the save status before closing this tab."
-          : "That code didn't match — wait for a fresh one and try again.",
-      );
+      setTotpError("That code didn't match — wait for a fresh one and try again.");
     }
   };
 
@@ -556,6 +560,8 @@ export default function CreateWizard({
                     type="button"
                     role="radio"
                     aria-checked={totpChoice === 'skip'}
+                    disabled={enrolled}
+                    title={enrolled ? 'The authenticator is already on — turn it off later in Settings if needed' : undefined}
                     onClick={() => chooseTotp('skip')}
                     className={cn(
                       'flex items-start gap-3 rounded-xl border p-4 text-left transition-colors duration-200',
@@ -684,6 +690,12 @@ export default function CreateWizard({
                             >
                               <ShieldCheck className="h-4 w-4" /> Authenticator enabled.
                             </motion.p>
+                          )}
+                          {enrolled && enrollSaveWarning && (
+                            <p className="text-sm text-kh-warning" role="status">
+                              This browser hasn't saved it yet — KeyHaven keeps retrying. Check the save status
+                              before closing this tab.
+                            </p>
                           )}
                         </div>
                       </div>

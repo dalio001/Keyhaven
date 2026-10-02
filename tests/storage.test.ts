@@ -135,6 +135,36 @@ describe('IndexedDB vault storage', () => {
     await expect(s.readCurrent()).rejects.toBeInstanceOf(StorageError); // VersionError → storage error
   });
 
+  it('a write that times out is aborted — it never lands later behind the caller\'s back', async () => {
+    const f = new IDBFactory();
+    const s = createIdbStorage({ factory: f, timeoutMs: 150 });
+    await s.create(rec('c1'));
+
+    // a second connection keeps a readwrite transaction busy on the same store,
+    // so our write is queued behind it and cannot finish within the timeout
+    const other = await new Promise<IDBDatabase>((resolve) => {
+      const r = f.open('keyhaven', 2);
+      r.onsuccess = () => resolve(r.result);
+    });
+    let holding = true;
+    const blocker = other.transaction('vault', 'readwrite');
+    const spin = () => {
+      const q = blocker.objectStore('vault').get('current');
+      q.onsuccess = () => {
+        if (holding) spin();
+      };
+    };
+    spin();
+    const blockerDone = new Promise((r) => (blocker.oncomplete = r));
+
+    await expect(s.commit(rec('c2', { revision: 2 }), rec('c1'))).rejects.toMatchObject({ failure: 'timeout' });
+    holding = false;
+    await blockerDone;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await s.readCurrent()).toMatchObject({ commitId: 'c1' }); // the timed-out write did not land
+    other.close();
+  });
+
   it('times out instead of hanging forever', async () => {
     const f = new IDBFactory();
     const old = await new Promise<IDBDatabase>((resolve) => {

@@ -25,8 +25,8 @@ const COLUMNS: { title: string; links: { label: string; to: string }[] }[] = [
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy — we can’t see your data', to: '/about' },
-      { label: 'Terms', to: '/about' },
+      // the About page's "No accounts, ever" principles; there are no separate terms yet (KH-10)
+      { label: 'Privacy — we can’t see your data', to: '/about#privacy' },
     ],
   },
 ];

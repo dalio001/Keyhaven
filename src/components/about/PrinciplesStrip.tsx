@@ -29,7 +29,7 @@ const PRINCIPLES = [
 
 export default function PrinciplesStrip() {
   return (
-    <section className="border-t border-kh-line py-20 md:py-24">
+    <section id="privacy" className="scroll-mt-24 border-t border-kh-line py-20 md:py-24">
       <div className="mx-auto grid max-w-marketing gap-10 px-6 md:grid-cols-3">
         {PRINCIPLES.map((p, i) => (
           <motion.div

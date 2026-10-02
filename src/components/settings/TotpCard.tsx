@@ -246,12 +246,13 @@ export default function TotpCard() {
                 Step 1 — Scan
               </p>
               <div className="mt-3 flex flex-wrap items-start gap-5">
-                <div className="relative overflow-hidden rounded-xl border border-kh-lineStrong bg-kh-base p-3">
+                {/* dark-on-light like the setup wizard: many scanner apps can't read light-on-dark codes */}
+                <div className="relative overflow-hidden rounded-xl bg-[#EAF0FA] p-3">
                   <QRCodeSVG
                     value={setup.uri}
                     size={180}
-                    bgColor="transparent"
-                    fgColor="#35F0A1"
+                    bgColor="#EAF0FA"
+                    fgColor="#0A0F1C"
                     level="M"
                     aria-label="TOTP enrollment QR code"
                   />

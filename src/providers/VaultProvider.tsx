@@ -83,6 +83,12 @@ export interface VaultContextValue {
   dismissMigrationNotice: () => void;
   /** seconds until auto-lock (null when timer inactive) */
   lockCountdown: number | null;
+  /**
+   * pause the idle auto-lock until the returned release is called — for the
+   * setup wizard, where the user is away from the keyboard scanning a QR code
+   * or writing down backup codes
+   */
+  holdAutoLock: () => () => void;
   /** seconds until the clipboard is wiped (null when inactive) */
   clipboardCountdown: number | null;
   lastCopiedLabel: string | null;
@@ -169,6 +175,7 @@ export function VaultProvider({
   const [pendingTotpSecret, setPendingTotpSecret] = useState<string | null>(null);
   const [ackTick, setAckTick] = useState(0);
   const lastActivityRef = useRef<number>(0);
+  const autoLockHoldsRef = useRef(0);
   const clipTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const status = snap.status;
@@ -230,6 +237,7 @@ export function VaultProvider({
     const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
     events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
     const interval = setInterval(() => {
+      if (autoLockHoldsRef.current > 0) lastActivityRef.current = Date.now();
       const left = autoLockMinutes * 60 - Math.floor((Date.now() - lastActivityRef.current) / 1000);
       setLockCountdown(Math.max(0, left));
       if (left <= 0) void controller.lock(); // idempotent
@@ -239,6 +247,17 @@ export function VaultProvider({
       clearInterval(interval);
     };
   }, [status, autoLockMinutes, controller]);
+
+  const holdAutoLock = useCallback(() => {
+    autoLockHoldsRef.current += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      autoLockHoldsRef.current -= 1;
+      lastActivityRef.current = Date.now(); // the idle clock starts over when the hold ends
+    };
+  }, []);
 
   /* ---------------- clipboard auto-clear ---------------- */
   useEffect(
@@ -421,6 +440,7 @@ export function VaultProvider({
       migrationNotice,
       dismissMigrationNotice,
       lockCountdown: unlocked && autoLockMinutes > 0 ? lockCountdown : null,
+      holdAutoLock,
       clipboardCountdown,
       lastCopiedLabel,
       createVault,
@@ -451,7 +471,7 @@ export function VaultProvider({
       destroyVault,
     }),
     [
-      status, snap, settings, unlocked, autoLockMinutes, lockCountdown, clipboardCountdown, lastCopiedLabel,
+      status, snap, settings, unlocked, autoLockMinutes, lockCountdown, holdAutoLock, clipboardCountdown, lastCopiedLabel,
       pendingTotpSecret, migrationNotice, dismissNotice, dismissMigrationNotice, createVault, unlock, lock,
       retryStorage, addEntry, updateEntry, removeEntry, toggleFavorite, updateSettings, flush, retrySave,
       discardUnsaved, unsavedBackupText, beginTotpEnrollment, confirmTotpEnrollment, cancelTotpEnrollment,

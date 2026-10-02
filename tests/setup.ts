@@ -25,6 +25,8 @@ if (typeof document !== 'undefined') {
   const w = window as unknown as Record<string, unknown>;
   if (!w.IntersectionObserver) w.IntersectionObserver = NoopObserver;
   if (!w.ResizeObserver) w.ResizeObserver = NoopObserver;
+  // input-otp (Settings code fields) probes for password-manager badges
+  if (!document.elementFromPoint) document.elementFromPoint = () => null;
   if (!window.matchMedia) {
     window.matchMedia = ((query: string) => ({
       matches: false,

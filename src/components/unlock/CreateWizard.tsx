@@ -15,7 +15,7 @@
  * (Passkey registration was removed in Phase 1 — see docs/security-model.md.)
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -27,6 +27,7 @@ import {
   FileDown,
   KeyRound,
   Loader2,
+  Lock,
   Printer,
   QrCode,
   ShieldCheck,
@@ -90,6 +91,9 @@ export default function CreateWizard({
     backupCodes,
     copyWithAutoClear,
     destroyVault,
+    status,
+    lockReason,
+    holdAutoLock,
   } = useVault();
 
   const [step, setStep] = useState(1);
@@ -127,6 +131,13 @@ export default function CreateWizard({
   const [saved, setSaved] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [printBlocked, setPrintBlocked] = useState(false);
+
+  // once the vault exists the user is often away from the keyboard (scanning
+  // the QR code, writing down backup codes) — don't idle-lock mid-setup
+  useEffect(() => (vaultCreated ? holdAutoLock() : undefined), [vaultCreated, holdAutoLock]);
+  // it can still lock (another tab unlocked it, storage was replaced…):
+  // say so instead of rejecting codes against a dropped enrollment
+  const lockedMidSetup = vaultCreated && status !== 'unlocked';
 
   const pwScore = useMemo(() => (password ? zxcvbn(password).score : 0), [password]);
   const mismatch = confirm.length > 0 && confirm !== password;
@@ -196,6 +207,8 @@ export default function CreateWizard({
       // backup codes must be shown in the next step
       setEnrolled(true);
       setEnrollSaveWarning(result === 'save-failed');
+    } else if (result === 'locked') {
+      setTotpCode(''); // the locked-mid-setup panel explains what happened
     } else {
       setTotpShake((k) => k + 1);
       setTotpCode('');
@@ -499,7 +512,39 @@ export default function CreateWizard({
             )}
 
             {/* ---------------- STEP 2 — TOTP ---------------- */}
-            {step === 2 && (
+            {lockedMidSetup && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h3 className="flex items-center gap-2 font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">
+                    <Lock className="h-5 w-5 text-kh-warning" /> KeyHaven locked during setup.
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-[22px] text-kh-muted">
+                    {lockReason === 'other-tab'
+                      ? 'It was unlocked in another tab, so this one locked. '
+                      : 'This tab locked before setup finished. '}
+                    Your vault is created and saved with your master password — unlock it to continue.
+                    {enrolled
+                      ? ' Your authenticator is on; you can view or replace its backup codes in Settings → Security methods.'
+                      : ' You can turn on the authenticator in Settings → Security methods.'}
+                  </p>
+                  {totpChoice === 'app' && !enrolled && (
+                    <p className="mt-2 text-sm leading-[22px] text-kh-muted">
+                      If you already added a KeyHaven entry to your authenticator app in this step,
+                      delete it — it was never turned on, so its codes won't work.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onSwitchToUnlock}
+                  className="bg-aurora flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-[#04110B] transition-all duration-200 hover:-translate-y-px hover:shadow-glow active:scale-[0.97]"
+                >
+                  Unlock vault
+                </button>
+              </div>
+            )}
+
+            {step === 2 && !lockedMidSetup && (
               <div className="flex flex-col gap-4">
                 <div>
                   <h3 className="font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">
@@ -723,7 +768,7 @@ export default function CreateWizard({
             )}
 
             {/* ---------------- STEP 3 — safety: backup codes + no recovery ---------------- */}
-            {step === 3 && (
+            {step === 3 && !lockedMidSetup && (
               <div className="flex flex-col gap-4">
                 <div>
                   <h3 className="font-display text-2xl font-semibold tracking-[-0.01em] text-kh-primary">

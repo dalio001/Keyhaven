@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { getTotpCode } from '@/lib/totp';
 import { VaultProvider } from '@/providers/VaultProvider';
@@ -26,7 +26,41 @@ function renderWizard(c: Awaited<ReturnType<typeof started>>['c']) {
   );
 }
 
+async function toAuthenticatorStep(c: Awaited<ReturnType<typeof started>>['c']) {
+  renderWizard(c);
+  fireEvent.change(screen.getByLabelText('New master password'), { target: { value: STRONG } });
+  fireEvent.change(screen.getByLabelText('Confirm master password'), { target: { value: STRONG } });
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await screen.findByText('Step 2 of 3');
+  fireEvent.click(await screen.findByRole('radio', { name: /Authenticator app/ }, { timeout: 3000 }));
+  await screen.findByLabelText('Six-digit authenticator code');
+}
+
 describe('CreateWizard authenticator step', () => {
+  it('the idle auto-lock does not fire while the user is scanning the QR code', async () => {
+    const { c } = await started();
+    await toAuthenticatorStep(c);
+    expect(c.getSnapshot().status).toBe('unlocked');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(Date.now() + 6 * 60_000)); // 6 minutes with no clicks or keys
+      await act(() => new Promise<void>((r) => setTimeout(r, 1500))); // let the 1s auto-lock tick run
+      expect(c.getSnapshot().status).toBe('unlocked');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('if the vault locks mid-setup, the wizard says so instead of rejecting the code', async () => {
+    const { c } = await started();
+    await toAuthenticatorStep(c);
+    await act(() => c.lock('other-tab'));
+    await screen.findByText('KeyHaven locked during setup.');
+    expect(screen.getByRole('button', { name: 'Unlock vault' })).toBeTruthy();
+    expect(screen.queryByText(/didn't match/)).toBeNull();
+    expect(screen.queryByLabelText('Six-digit authenticator code')).toBeNull(); // the stale QR/code entry is gone
+  });
+
   it('shows a visible label telling the user where to type the code', async () => {
     const { c } = await started();
     renderWizard(c);

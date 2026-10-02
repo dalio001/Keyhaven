@@ -123,6 +123,11 @@ After the configured inactivity time the vault locks. The "Only when the tab clo
 timer. Locking first encrypts any unsaved change with the current key, then drops the key and the
 decrypted data from memory. See [Saving changes](#saving-changes).
 
+The timer is paused while the create-vault wizard is open (from the moment the vault is created until
+the wizard finishes), because setting up the authenticator and writing down backup codes happens away
+from the keyboard. The new vault holds only sample entries at that point. If the vault locks anyway
+during setup (for example, it was unlocked in another tab), the wizard says so and sends you to unlock.
+
 ---
 
 ## There is no master-password recovery

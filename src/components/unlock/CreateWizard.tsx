@@ -660,7 +660,11 @@ export default function CreateWizard({
                         </AnimatePresence>
 
                         <div className="flex flex-col items-start gap-2 self-start">
+                          <label htmlFor="kh-enroll-code" className="text-sm font-medium text-kh-primary">
+                            Enter the 6-digit code from your app
+                          </label>
                           <OtpInput
+                            id="kh-enroll-code"
                             value={totpCode}
                             onChange={(v) => {
                               setTotpCode(v);

@@ -29,8 +29,7 @@ import type { ImportFailure } from '@/lib/store/controller';
 import { downloadBackupFile } from '@/lib/download';
 import { KhButton, SectionCard, Spinner, StatusChip } from './ui';
 import { cn } from '@/lib/utils';
-
-const LAST_EXPORT_KEY = 'keyhaven:last-export';
+import { LAST_EXPORT_KEY } from '@/lib/lastExport';
 
 const IMPORT_ERRORS: Record<ImportFailure, string> = {
   'invalid-file': 'This file is not a valid KeyHaven backup.',

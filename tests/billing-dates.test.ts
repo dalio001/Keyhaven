@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
   addMonthsClamped,
   dayNumber,
   daysBetween,
   formatCalendarDate,
+  formatMonthYear,
   fromDayNumber,
   isCalendarDate,
+  monthBounds,
   nextOnOrAfter,
   occurrence,
+  occurrencesBetween,
   parseCalendarDate,
   relativeDays,
   toCalendarDate,
@@ -117,5 +121,73 @@ describe('days and labels', () => {
     // formatting goes through the UTC day number, so the zone of the machine doesn't matter
     expect(formatCalendarDate('2027-01-31', 'en-US')).toBe('Jan 31, 2027');
     expect(formatCalendarDate('2028-02-29', 'en-US')).toBe('Feb 29, 2028');
+  });
+});
+
+describe('date ranges (Phase 4)', () => {
+  it('adds days across month, year and leap-day boundaries', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2026-10-02', 30)).toBe('2026-11-01');
+    expect(addDays('2026-10-02', -2)).toBe('2026-09-30');
+    expect(addDays('nope', 1)).toBeNull();
+  });
+
+  it('month bounds, including February in leap and common years', () => {
+    expect(monthBounds('2026-10-15')).toEqual({ start: '2026-10-01', end: '2026-10-31' });
+    expect(monthBounds('2028-02-10')).toEqual({ start: '2028-02-01', end: '2028-02-29' });
+    expect(monthBounds('2027-02-28')).toEqual({ start: '2027-02-01', end: '2027-02-28' });
+    expect(monthBounds('2026-02-30')).toBeNull();
+  });
+
+  it('lists every billing date in a range, both ends included, always counted from the anchor', () => {
+    expect(occurrencesBetween('2027-01-31', MONTHLY, '2027-01-01', '2027-04-30')).toEqual(['2027-01-31', '2027-02-28', '2027-03-31', '2027-04-30']);
+    expect(occurrencesBetween('2028-01-31', MONTHLY, '2028-02-01', '2028-03-31')).toEqual(['2028-02-29', '2028-03-31']);
+    expect(occurrencesBetween('2028-02-29', ANNUAL, '2028-01-01', '2032-12-31')).toEqual(['2028-02-29', '2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29']);
+    expect(occurrencesBetween('2026-09-25', { unit: 'week', count: 2 }, '2026-10-01', '2026-10-31')).toEqual(['2026-10-09', '2026-10-23']);
+    // anchor after the range, range before the anchor, inverted range
+    expect(occurrencesBetween('2027-01-31', MONTHLY, '2026-10-01', '2026-10-31')).toEqual([]);
+    expect(occurrencesBetween('2026-10-15', MONTHLY, '2026-10-15', '2026-10-15')).toEqual(['2026-10-15']);
+    expect(occurrencesBetween('2026-10-15', MONTHLY, '2026-10-31', '2026-10-01')).toEqual([]);
+  });
+
+  it('matches stepping one occurrence at a time, across a grid of anchors, intervals and ranges', () => {
+    const intervals: BillingInterval[] = [
+      { unit: 'day', count: 10 },
+      { unit: 'week', count: 1 },
+      { unit: 'week', count: 2 },
+      MONTHLY,
+      { unit: 'month', count: 3 },
+      ANNUAL,
+    ];
+    for (const anchor of ['2026-01-31', '2026-02-28', '2027-08-30', '2028-02-29']) {
+      for (const interval of intervals) {
+        for (let start = dayNumber(ymd('2026-01-01')); start < dayNumber(ymd('2030-01-01')); start += 37) {
+          const from = toCalendarDate(fromDayNumber(start));
+          const to = toCalendarDate(fromDayNumber(start + 45));
+          const expected: string[] = [];
+          for (let k = 0; ; k++) {
+            const d = occ(anchor, interval, k);
+            if (d > to) break;
+            if (d >= from) expected.push(d);
+          }
+          expect(occurrencesBetween(anchor, interval, from, to), `${anchor} ${interval.count} ${interval.unit} ${from}..${to}`).toEqual(expected);
+        }
+      }
+    }
+  });
+
+  it('stops at the limit and refuses invalid input', () => {
+    expect(occurrencesBetween('2026-01-01', { unit: 'day', count: 1 }, '2026-01-01', '2030-01-01', 5)).toHaveLength(5);
+    expect(occurrencesBetween('2026-02-30', MONTHLY, '2026-01-01', '2026-12-31')).toEqual([]);
+    expect(occurrencesBetween('2026-01-01', { unit: 'month', count: 0 } as BillingInterval, '2026-01-01', '2026-12-31')).toEqual([]);
+    expect(occurrencesBetween('2026-01-01', MONTHLY, 'x', '2026-12-31')).toEqual([]);
+  });
+
+  it('names the month of a calendar day', () => {
+    expect(formatMonthYear('2026-10-01', 'en-US')).toBe('October 2026');
+    expect(formatMonthYear('2028-02-29', 'en-US')).toBe('February 2028');
+    expect(formatMonthYear('bad', 'en-US')).toBe('bad');
   });
 });

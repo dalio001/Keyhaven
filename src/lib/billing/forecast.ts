@@ -121,10 +121,15 @@ export function totalsByCurrency(charges: readonly Charge[]): CurrencyTotal[] {
   return [...by.values()].sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
+/** the last day of "the next 12 months" from today (Oct 2 → Oct 1 next year); `null` for an invalid day */
+export function yearAheadEnd(today: CalendarDate): CalendarDate | null {
+  const t = parseCalendarDate(today);
+  return t ? addDays(toCalendarDate(addMonthsClamped(t, 12)), -1) : null;
+}
+
 export function subscriptionOverview(subs: readonly Subscription[], today: CalendarDate): Overview {
   const month = monthBounds(today)!;
-  const t = parseCalendarDate(today)!;
-  const yearEnd = addDays(toCalendarDate(addMonthsClamped(t, 12)), -1)!;
+  const yearEnd = yearAheadEnd(today)!;
   const upcomingEnd = addDays(today, UPCOMING_DAYS)!;
 
   let undated = 0;

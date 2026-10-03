@@ -10,8 +10,10 @@ import LetterAvatar from '@/components/LetterAvatar';
 import { formatCalendarDate, relativeDays } from '@/lib/billing/dates';
 import { subscriptionOverview } from '@/lib/billing/forecast';
 import { formatMoney } from '@/lib/billing/money';
+import { calendarFileName } from '@/lib/billing/ics';
 import { subscriptionState } from '@/lib/billing/status';
 import type { Account, Subscription, VaultEntry } from '@/lib/vault';
+import CalendarExport from './CalendarExport';
 import { accountTitle, manageHint, priceText } from './labels';
 import { displayHost, safeExternalUrl } from './links';
 import SubscriptionList from './SubscriptionList';
@@ -120,14 +122,17 @@ export default function AccountPage({
           <h4 id="acct-subs" className={SECTION_TITLE}>
             Subscriptions
           </h4>
-          <button
-            type="button"
-            onClick={onAddSubscription}
-            disabled={!canEdit}
-            className="flex items-center gap-1.5 text-sm font-medium text-kh-cyan transition-colors hover:text-kh-mint disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" /> Add subscription for this account
-          </button>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {subs.length > 0 && <CalendarExport subscriptions={subs} accounts={accounts} fileName={calendarFileName(accountTitle(account))} />}
+            <button
+              type="button"
+              onClick={onAddSubscription}
+              disabled={!canEdit}
+              className="flex items-center gap-1.5 text-sm font-medium text-kh-cyan transition-colors hover:text-kh-mint disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" /> Add subscription for this account
+            </button>
+          </div>
         </div>
         {subs.length === 0 ? (
           <p className="text-sm text-kh-muted">No subscriptions on this account.</p>

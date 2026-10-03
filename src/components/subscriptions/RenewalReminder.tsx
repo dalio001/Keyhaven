@@ -44,7 +44,7 @@ export default function RenewalReminder({ className = 'mb-4' }: { className?: st
           const to = account ? `/subscriptions?account=${encodeURIComponent(account.id)}` : `/subscriptions?edit=${encodeURIComponent(r.sub.id)}`;
           return (
             <li key={r.key} className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <Link to={to} className="min-w-0 flex-1 text-kh-primary transition-colors hover:text-kh-cyan">
+              <Link to={to} className="min-w-0 flex-1 basis-48 text-kh-primary transition-colors hover:text-kh-cyan">
                 <span className="font-medium">{accountTitle(account)}</span> {r.kind === 'trial' ? 'trial ends' : 'renews'} {relativeDays(r.daysLeft)}
                 <span className="text-kh-muted"> · {formatCalendarDate(r.date)}</span> — {r.kind === 'trial' && 'then '}
                 <span className="font-mono tabular-nums">{priceText(r.sub)}</span>

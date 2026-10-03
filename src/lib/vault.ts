@@ -105,6 +105,8 @@ export interface Subscription {
   provider: BillingProvider;
   /** provider name when `provider` is 'other' */
   providerOther?: string;
+  /** where to manage or cancel it: an http(s) link the user saved, opened only when they click it */
+  manageUrl?: string;
   notes?: string;
   /** ISO timestamps */
   createdAt: string;
@@ -118,6 +120,10 @@ export interface VaultSettings {
   clipboardClearSeconds: number;
   /** reveal secrets auto-remask after N seconds (default 15) */
   remaskSeconds: number;
+  /** renewal reminders: days ahead (0 = off; unset = 3) — read through `reminderDays()` in src/lib/billing/reminders.ts */
+  renewalReminderDays?: number;
+  /** "Hide until next time": `subscriptionId:YYYY-MM-DD` keys — read through `dismissedReminders()` */
+  dismissedReminders?: string[];
 }
 
 export const DEFAULT_SETTINGS: VaultSettings = {

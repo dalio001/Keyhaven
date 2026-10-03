@@ -73,12 +73,54 @@ describe('account pages (Phase 4)', () => {
     expect(manage.target).toBe('_blank');
     expect(manage.rel).toBe('noopener noreferrer');
     expect(screen.getByText(/Billed through Apple/)).toBeTruthy();
-    expect(within(screen.getByRole('region', { name: "Where it's managed" })).getAllByRole('link')).toHaveLength(1); // the Apple hint is text, not a link
+    // Phase 5: the App Store's own subscriptions page joins the website (the hint text stays)
+    expect(within(screen.getByRole('region', { name: "Where it's managed" })).getAllByRole('link').map((a) => a.textContent?.trim())).toEqual([
+      'Manage at chatgpt.com',
+      'Manage in the App Store',
+    ]);
 
     fireEvent.click(within(screen.getByRole('list', { name: 'Linked logins' })).getByRole('button', { name: /ChatGPT — work@example\.test/ }));
     expect(await screen.findByText('vault page')).toBeTruthy();
     expect(where()).toBe('/vault?entry=cg-login');
     expect(storage.committed.length).toBe(before); // viewing writes nothing
+  });
+
+  it('Phase 5: a saved "Manage or cancel" link and the App Store / Google Play pages, opened without opener or referrer', async () => {
+    const x = await freshVault();
+    x.c.mutate((p) => ({
+      ...p,
+      accounts: [WORK],
+      subscriptions: [
+        sub('team', 'a-work', { plan: 'Team', billingAnchor: '2026-10-15', manageUrl: 'https://chatgpt.com/#settings/subscription' }),
+        sub('ios', 'a-work', { plan: 'Plus', provider: 'apple', billingAnchor: '2026-10-20' }),
+        sub('play', 'a-work', { plan: 'Plus', provider: 'google-play', billingAnchor: '2026-10-21' }),
+        sub('ended', 'a-work', { status: 'canceled', provider: 'google-play', accessEndsOn: '2026-01-01', manageUrl: 'https://old.example.test/' }),
+      ],
+    }));
+    renderAt(x.c, '/subscriptions?account=a-work');
+    const region = await screen.findByRole('region', { name: "Where it's managed" });
+    const links = within(region).getAllByRole('link') as HTMLAnchorElement[];
+    expect(links.map((a) => [a.textContent?.trim(), a.href])).toEqual([
+      ['Manage or cancel Team at chatgpt.com', 'https://chatgpt.com/#settings/subscription'],
+      ['Manage in the App Store', 'https://apps.apple.com/account/subscriptions'],
+      ['Manage in Google Play', 'https://play.google.com/store/account/subscriptions'],
+    ]);
+    for (const a of links) {
+      expect(a.target).toBe('_blank');
+      expect(a.rel).toBe('noopener noreferrer');
+    }
+    // the subscription with its own link doesn't fall back to the account website as well
+    expect(within(region).queryByText(/Manage at chatgpt\.com/)).toBeNull();
+    expect(within(region).getByText(/Billed through Apple/)).toBeTruthy();
+    expect(within(region).getByText(/Billed through Google Play/)).toBeTruthy();
+  });
+
+  it('Phase 5: an unsafe saved link is never a link', async () => {
+    const x = await freshVault();
+    x.c.mutate((p) => ({ ...p, accounts: [OTHER], subscriptions: [sub('cloud', 'a-x', { billingAnchor: '2026-10-05', manageUrl: 'javascript:alert(1)' })] }));
+    renderAt(x.c, '/subscriptions?account=a-x');
+    const region = await screen.findByRole('region', { name: "Where it's managed" });
+    expect(within(region).queryAllByRole('link')).toEqual([]);
   });
 
   it('never links an unsafe website', async () => {

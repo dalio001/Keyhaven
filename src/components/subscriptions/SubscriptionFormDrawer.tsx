@@ -482,6 +482,23 @@ function FormBody({
         <FieldError show={!!err('providerOther')}>{err('providerOther') ?? ''}</FieldError>
       </Field>
 
+      {/* where to manage or cancel it */}
+      <Field>
+        <Label htmlFor="sf-manage">Manage or cancel link (optional)</Label>
+        <input
+          id="sf-manage"
+          type="url"
+          inputMode="url"
+          value={d.manageUrl}
+          onChange={(e) => set({ manageUrl: e.target.value })}
+          placeholder="https://… the page where you change or cancel the plan"
+          autoComplete="off"
+          className={cn(inputCls, err('manageUrl') && 'border-kh-danger/60')}
+        />
+        <p className="text-xs text-kh-faint">Shown on the account page. KeyHaven only opens it when you click it.</p>
+        <FieldError show={!!err('manageUrl')}>{err('manageUrl') ?? ''}</FieldError>
+      </Field>
+
       {/* notes */}
       <Field>
         <Label htmlFor="sf-notes">Notes</Label>

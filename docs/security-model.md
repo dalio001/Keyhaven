@@ -27,6 +27,7 @@ Everything lives in the browser profile that runs KeyHaven. Nothing is sent to a
 | same store, key `previous` | The vault replaced by the last import/restore, if any (deletable from Settings) | Ciphertext + public metadata |
 | `localStorage` `keyhaven.lastMethod`, `keyhaven:last-export`, `keyhaven:prefs`, `keyhaven.watchtower.ignored`, `keyhaven:migration-ack:<vaultId>`, `keyhaven:backup-reminder-snoozed-until` | UI preferences, last export time, acknowledged notices, Watchtower "ignored" entry ids, until when the backup reminder is snoozed (a time only) | No |
 | `sessionStorage` `kh-vault-welcomed` | Welcome-toast flag | No |
+| A calendar file you choose to create (`keyhaven-renewals*.ics`), saved wherever your browser puts downloads | Service and account names, plans, prices and renewal dates for the next 12 months (see [Accounts and subscriptions](#accounts-and-subscriptions)) | **Not encrypted** |
 
 ### The vault record (format v2)
 
@@ -71,9 +72,34 @@ record, and nothing is looked up online: prices and dates are exactly what you e
   - "Expected this month" and "next 12 months" are the charges actually scheduled (counted from the date
     you entered). The monthly average is a separate estimate: month ÷ count, year ÷ 12·count, and week/day
     plans at 365.2425 days a year.
-- **"Manage at …" links** open the account's saved website in a new tab (`noopener noreferrer`, http/https
-  only) when you click them; KeyHaven itself never contacts the site. Apple and Google Play subscriptions
-  get written instructions, not links.
+- **Renewal reminders** (Phase 5) are worked out the same way, from the totals rules above: each renewal
+  or trial end from today to N days ahead, shown on the vault page and at the top of the Overview, only
+  while KeyHaven is open. N (`renewalReminderDays`: 0 = off, default 3) and the "Hide until next time"
+  list (`dismissedReminders`: `subscriptionId:YYYY-MM-DD` keys, past days dropped on the next write)
+  live in the vault's **encrypted settings**, never in `localStorage`. Viewing never writes; hiding one or
+  changing N is an ordinary encrypted save. Older builds keep both keys (settings are read as
+  defaults + stored keys, and saved back whole).
+- **The calendar file** ("Add to calendar" on the Overview or an account page) is the one thing here that
+  leaves the encrypted vault, and only when you create it. The dialog says first that it is **not
+  encrypted**. It holds service and account names, plans, prices and dates — never emails, websites,
+  notes, links, usernames or passwords — and KeyHaven never sends it anywhere: you save it and import it
+  into your calendar app yourself.
+  - All-day events (`DTSTART;VALUE=DATE`): a date with no time zone, the same day everywhere. The dates
+    are KeyHaven's own for the next 12 months: day and week plans as one repeating event (`RRULE`,
+    bounded to the 12 months), month and year plans as one event per charge (the month-end rule above
+    has no recurrence rule every app supports). A trial's end is its first charge; canceled, undated and
+    needs-attention subscriptions are left out.
+  - Each event has an alarm at 9:00, N days before (N from the reminder setting; no alarms when off).
+  - Stable UIDs (`<subscriptionId>-<YYYYMMDD>@keyhaven.local`, or `<subscriptionId>-series@keyhaven.local` for a repeating event), CRLF
+    lines folded at 75 octets, RFC 5545 text escaping. Creating the file never writes to the vault.
+- **Links out of KeyHaven** open in a new tab (`noopener noreferrer`, http/https only, never an address
+  with a user name or password) when you click them; KeyHaven itself never contacts the site.
+  - "Manage or cancel" — a link you saved on the subscription (optional field `manageUrl`; anything that
+    isn't an http/https address is refused). No record-version bump: older builds keep unknown fields.
+  - "Manage at …" — the account's saved website, for subscriptions billed there without a link of their own.
+  - Apple and Google Play subscriptions link to the stores' subscription pages
+    (`https://apps.apple.com/account/subscriptions`, `https://play.google.com/store/account/subscriptions`),
+    next to written instructions. KeyHaven ships no cancellation addresses for individual services.
 
 ---
 
@@ -346,8 +372,14 @@ leaked key did not need it.
   background tabs. Compare-and-swap still prevents overwrites, but a stale tab may then report a conflict.
 - **New vaults are seeded with sample entries** (existing behaviour, unchanged here).
 - **Subscription details are what you enter.** KeyHaven doesn't fetch prices, verify renewals, charge or
-  cancel anything, and has no currency conversion. Renewal reminders, calendar export and cancellation help
-  are later work.
+  cancel anything, and has no currency conversion.
+- **Reminders need KeyHaven open, or a calendar file.** There is no server and no notification permission:
+  the in-app reminders appear only while KeyHaven is open. The calendar file carries them into your
+  calendar app, but some apps ignore alarms in imported files and use their own default notifications.
+- **A calendar file is a snapshot.** Importing a newer file updates events in apps that match them by UID;
+  others may add copies. Importing never deletes: events for a subscription you later canceled, or a date
+  you changed, stay in your calendar until you delete them (importing into a separate calendar makes that
+  easy). The file itself is unencrypted — delete it after importing if that matters to you.
 
 ---
 
@@ -377,6 +409,9 @@ npm run lint
 | Overview totals: per currency, scheduled charges vs averages, trials, needs-attention, leap days, time zones | `tests/billing-forecast.test.ts`, `tests/billing-timezones.test.ts`, `tests/ui/subscriptions-overview.test.tsx` |
 | Account pages, safe "Manage at" links, links that survive unlocking | `tests/ui/account-page.test.tsx`, `tests/subscription-links.test.ts`, `tests/deep-link.test.ts`, `tests/ui/vault-deep-links.test.tsx` |
 | Persistent storage request, backup reminder, midnight rollover | `tests/persistence.test.ts`, `tests/ui/storage-persistence.test.tsx`, `tests/backup-reminder.test.ts`, `tests/ui/backup-reminder.test.tsx`, `tests/ui/use-today.test.tsx` |
+| Renewal reminders: window, trials, month ends, leap days, "Hide until next time", settings kept encrypted, viewing never writes | `tests/billing-reminders.test.ts`, `tests/ui/renewal-reminder.test.tsx` |
+| Calendar file: golden file, RRULE vs explicit dates, alarms, escaping and folding, no emails/notes/links, same bytes in 5 time zones; the export dialog | `tests/billing-ics.test.ts`, `tests/ui/calendar-export.test.tsx` |
+| "Manage or cancel" links: saved as http(s) only, App Store / Google Play pages, `noopener noreferrer` | `tests/subscription-form.test.ts`, `tests/ui/subscriptions.test.tsx`, `tests/ui/account-page.test.tsx` |
 
 Golden fixtures in `tests/fixtures/` were generated with the pre-Phase-1 code, using synthetic passwords and
 data only. `tests/legacy/v1.ts` keeps a frozen copy of the legacy algorithms for these tests; application

@@ -69,6 +69,35 @@ describe('Subscriptions page', () => {
     expect(stored[0]).toMatchObject({ amountMinor: 2000, currency: 'USD', billingAnchor: '2026-10-15', status: 'active' });
   });
 
+  it('Phase 5: saves a "Manage or cancel" link (as a web address) and refuses anything else', async () => {
+    const { c, storage } = await freshVault();
+    renderAt(c, '/subscriptions?tab=subscriptions');
+    await screen.findByText('No subscriptions yet');
+    await addChatGpt({ label: 'Work', amount: '20', date: '2026-10-15' });
+    await screen.findByText('ChatGPT · Work');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: /^Edit ChatGPT/ }));
+    await screen.findByRole('dialog');
+    fill('Manage or cancel link (optional)', 'javascript:alert(1)');
+    fireEvent.click(screen.getByRole('button', { name: 'Save subscription' }));
+    expect(await screen.findByText('Enter a web address, like https://example.com/account.')).toBeTruthy();
+    fill('Manage or cancel link (optional)', ' chatgpt.com/#settings/subscription ');
+    fireEvent.click(screen.getByRole('button', { name: 'Save subscription' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await act(() => c.flush());
+    expect(listSubscriptions(await readStoredPayload(storage))[0].manageUrl).toBe('https://chatgpt.com/#settings/subscription');
+
+    // clearing it removes it
+    fireEvent.click(screen.getByRole('button', { name: /^Edit ChatGPT/ }));
+    expect(((await screen.findByLabelText('Manage or cancel link (optional)')) as HTMLInputElement).value).toBe('https://chatgpt.com/#settings/subscription');
+    fill('Manage or cancel link (optional)', '');
+    fireEvent.click(screen.getByRole('button', { name: 'Save subscription' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await act(() => c.flush());
+    expect(listSubscriptions(await readStoredPayload(storage))[0]).not.toHaveProperty('manageUrl');
+  });
+
   it('a personal ChatGPT account stays distinct from the work one', async () => {
     const { c } = await freshVault();
     renderAt(c, '/subscriptions?tab=subscriptions');

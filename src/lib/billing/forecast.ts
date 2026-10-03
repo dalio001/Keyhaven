@@ -72,6 +72,11 @@ export interface Overview {
   needsAttention: number;
 }
 
+/** soonest first; on the same day a trial's end before renewals */
+export function compareUpcoming(a: UpcomingCharge, b: UpcomingCharge): number {
+  return a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'trial' ? -1 : 1) || a.sub.id.localeCompare(b.sub.id);
+}
+
 /** counted in the figures: nothing unusable, and still renewing or in a trial */
 export function isBillable(state: SubscriptionState): boolean {
   return state.problems.length === 0 && (state.kind === 'renews' || state.kind === 'trial');
@@ -116,10 +121,15 @@ export function totalsByCurrency(charges: readonly Charge[]): CurrencyTotal[] {
   return [...by.values()].sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
+/** the last day of "the next 12 months" from today (Oct 2 → Oct 1 next year); `null` for an invalid day */
+export function yearAheadEnd(today: CalendarDate): CalendarDate | null {
+  const t = parseCalendarDate(today);
+  return t ? addDays(toCalendarDate(addMonthsClamped(t, 12)), -1) : null;
+}
+
 export function subscriptionOverview(subs: readonly Subscription[], today: CalendarDate): Overview {
   const month = monthBounds(today)!;
-  const t = parseCalendarDate(today)!;
-  const yearEnd = addDays(toCalendarDate(addMonthsClamped(t, 12)), -1)!;
+  const yearEnd = yearAheadEnd(today)!;
   const upcomingEnd = addDays(today, UPCOMING_DAYS)!;
 
   let undated = 0;
@@ -147,7 +157,7 @@ export function subscriptionOverview(subs: readonly Subscription[], today: Calen
     const [next] = occurrencesBetween(anchor, sub.interval, today, upcomingEnd, 1);
     if (next) upcoming.push({ sub, date: next, daysLeft: daysBetween(today, next)!, kind: state.kind === 'trial' ? 'trial' : 'renews' });
   }
-  upcoming.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'trial' ? -1 : 1) || a.sub.id.localeCompare(b.sub.id));
+  upcoming.sort(compareUpcoming);
 
   const monthCharges = chargesBetween(subs, month.start, month.end, today);
   const monthTotals: MonthTotal[] = totalsByCurrency(monthCharges).map((total) => {

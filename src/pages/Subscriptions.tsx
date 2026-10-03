@@ -16,6 +16,9 @@ import AccountFormDrawer from '@/components/subscriptions/AccountFormDrawer';
 import AccountsPanel from '@/components/subscriptions/AccountsPanel';
 import SubscriptionFormDrawer from '@/components/subscriptions/SubscriptionFormDrawer';
 import SubscriptionList from '@/components/subscriptions/SubscriptionList';
+import SubscriptionsOverview from '@/components/subscriptions/SubscriptionsOverview';
+import { parseView, selectedTab } from '@/components/subscriptions/view-params';
+import type { SubscriptionsTab } from '@/components/subscriptions/view-params';
 import { draftFromSubscription, newDraft } from '@/components/subscriptions/form-model';
 import { accountTitle } from '@/components/subscriptions/labels';
 import VaultToasts from '@/components/vault/VaultToasts';
@@ -68,7 +71,8 @@ function SubscriptionsView() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const today = useToday();
-  const tab = params.get('tab') === 'accounts' ? 'accounts' : 'subscriptions';
+  const view = parseView(params);
+  const tab = selectedTab(view);
   const [accountForm, setAccountForm] = useState<AccountForm>({ open: false, account: null });
 
   /* the subscription drawer is driven by the URL, so links from a login open it */
@@ -113,11 +117,12 @@ function SubscriptionsView() {
       next.delete('new');
       return next;
     });
-  const setTab = (t: 'subscriptions' | 'accounts') =>
+  const setTab = (t: SubscriptionsTab) =>
     setParams((p) => {
       const next = new URLSearchParams(p);
-      if (t === 'accounts') next.set('tab', 'accounts');
-      else next.delete('tab');
+      next.delete('account');
+      if (t === 'overview') next.delete('tab');
+      else next.set('tab', t);
       return next;
     });
   const openLogin = (entryId: string) => navigate(`/vault?entry=${encodeURIComponent(entryId)}`);
@@ -222,8 +227,12 @@ function SubscriptionsView() {
         </p>
       )}
 
-      <div role="tablist" aria-label="View" className="flex gap-1 rounded-xl border border-kh-line bg-kh-inset p-1 self-start">
-        {(['subscriptions', 'accounts'] as const).map((t) => (
+      <div
+        role="tablist"
+        aria-label="View"
+        className="flex max-w-full gap-1 self-start overflow-x-auto whitespace-nowrap rounded-xl border border-kh-line bg-kh-inset p-1"
+      >
+        {(['overview', 'subscriptions', 'accounts'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -235,12 +244,20 @@ function SubscriptionsView() {
               tab === t ? 'bg-kh-elevated text-kh-primary' : 'text-kh-muted hover:text-kh-primary',
             )}
           >
-            {t === 'subscriptions' ? `Subscriptions (${subscriptions.length})` : `Accounts (${accounts.length})`}
+            {t === 'overview' ? 'Overview' : t === 'subscriptions' ? `Subscriptions (${subscriptions.length})` : `Accounts (${accounts.length})`}
           </button>
         ))}
       </div>
 
-      {tab === 'subscriptions' ? (
+      {tab === 'overview' && subscriptions.length > 0 ? (
+        <SubscriptionsOverview
+          subscriptions={subscriptions}
+          accounts={accounts}
+          today={today}
+          onOpen={openEdit}
+          onShowList={() => setTab('subscriptions')}
+        />
+      ) : tab !== 'accounts' ? (
         <SubscriptionList
           subscriptions={subscriptions}
           accounts={accounts}

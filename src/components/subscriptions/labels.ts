@@ -53,3 +53,11 @@ export function accountTitle(a: Account | undefined): string {
   if (!a) return 'Unknown account';
   return a.label ? `${a.service} · ${a.label}` : a.service;
 }
+
+/** where to manage a subscription that isn't billed through the service's own website — instructions only, no links */
+export function manageHint(sub: Subscription): string {
+  if (sub.provider === 'apple') return 'Billed through Apple: on iPhone or iPad, open Settings → your name → Subscriptions.';
+  if (sub.provider === 'google-play') return 'Billed through Google Play: open the Play Store → your profile → Payments & subscriptions → Subscriptions.';
+  if (sub.provider === 'other') return `Billed through ${sub.providerOther || 'another provider'}: manage it where you signed up.`;
+  return '';
+}

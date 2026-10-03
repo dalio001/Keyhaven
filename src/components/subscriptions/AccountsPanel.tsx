@@ -1,9 +1,9 @@
 /**
  * AccountsPanel — accounts with their linked logins and subscription count.
- * Full account pages come with the dashboard; this is the minimal list.
+ * A row opens the account's page; the pencil edits it in place.
  */
 
-import { KeyRound, Plus } from 'lucide-react';
+import { KeyRound, Pencil, Plus } from 'lucide-react';
 import LetterAvatar from '@/components/LetterAvatar';
 import type { Account, Subscription, VaultEntry } from '@/lib/vault';
 import { accountTitle } from './labels';
@@ -12,6 +12,7 @@ export default function AccountsPanel({
   accounts,
   subscriptions,
   entries,
+  onOpen,
   onEdit,
   onAdd,
   onOpenLogin,
@@ -19,6 +20,7 @@ export default function AccountsPanel({
   accounts: Account[];
   subscriptions: Subscription[];
   entries: VaultEntry[];
+  onOpen: (account: Account) => void;
   onEdit: (account: Account) => void;
   onAdd: () => void;
   onOpenLogin: (entryId: string) => void;
@@ -55,8 +57,8 @@ export default function AccountsPanel({
                 <LetterAvatar name={a.service || '?'} size={38} />
                 <button
                   type="button"
-                  onClick={() => onEdit(a)}
-                  aria-label={`Edit account ${accountTitle(a)}`}
+                  onClick={() => onOpen(a)}
+                  aria-label={`Open account ${accountTitle(a)}`}
                   className="min-w-0 flex-1 basis-48 text-left"
                 >
                   <span className="block truncate text-[15px] font-semibold text-kh-primary">{accountTitle(a)}</span>
@@ -65,6 +67,14 @@ export default function AccountsPanel({
                 <span className="shrink-0 rounded-full border border-kh-line bg-kh-inset px-2.5 py-0.5 font-mono text-[11px] text-kh-muted">
                   {subs} subscription{subs === 1 ? '' : 's'}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => onEdit(a)}
+                  aria-label={`Edit account ${accountTitle(a)}`}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-kh-faint transition-colors hover:bg-kh-inset hover:text-kh-primary"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
                 {logins.length > 0 && (
                   <div className="flex basis-full flex-wrap gap-1.5 pl-[54px] max-sm:pl-0">
                     {logins.map((e) => (

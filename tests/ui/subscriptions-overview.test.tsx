@@ -115,14 +115,14 @@ describe('Subscriptions Overview (Phase 4)', () => {
     expect(c.getSnapshot().save.unsaved).toBe(false);
   });
 
-  it('choosing an upcoming renewal opens it', async () => {
+  it('choosing an upcoming renewal opens its account page', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 2, 12, 0) });
     const { c } = await seeded();
     renderAt(c, '/subscriptions');
     const rows = within(await screen.findByRole('list', { name: 'Upcoming renewals' })).getAllByRole('button');
     fireEvent.click(rows[2]);
-    expect(await screen.findByRole('dialog')).toBeTruthy();
-    expect((screen.getByLabelText('Price') as HTMLInputElement).value).toBe('20.00');
+    expect(await screen.findByRole('heading', { name: 'ChatGPT · Work' })).toBeTruthy();
+    expect((screen.getByRole('tab', { name: /Accounts/ })).getAttribute('aria-selected')).toBe('true');
   });
 
   it('the month rolls over at midnight with auto-lock off', async () => {

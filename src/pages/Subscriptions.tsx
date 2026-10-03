@@ -13,6 +13,7 @@ import { AlertTriangle, Plus } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
 import SettingsShell from '@/components/settings/SettingsShell';
 import AccountFormDrawer from '@/components/subscriptions/AccountFormDrawer';
+import AccountPage from '@/components/subscriptions/AccountPage';
 import AccountsPanel from '@/components/subscriptions/AccountsPanel';
 import SubscriptionFormDrawer from '@/components/subscriptions/SubscriptionFormDrawer';
 import SubscriptionList from '@/components/subscriptions/SubscriptionList';
@@ -73,6 +74,7 @@ function SubscriptionsView() {
   const today = useToday();
   const view = parseView(params);
   const tab = selectedTab(view);
+  const pageAccountId = view.kind === 'account' ? view.accountId : null;
   const [accountForm, setAccountForm] = useState<AccountForm>({ open: false, account: null });
 
   /* the subscription drawer is driven by the URL, so links from a login open it */
@@ -88,10 +90,10 @@ function SubscriptionsView() {
     // the currency of the most recently changed subscription, else US dollars
     const recent = [...subscriptions].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))[0];
     const login = entries.find((e) => e.id === loginId);
-    return newDraft({ presetKey, currency: recent?.currency ?? 'USD', login, accounts });
+    return newDraft({ presetKey, currency: recent?.currency ?? 'USD', login, accounts, accountId: pageAccountId ?? undefined });
     // re-create only when the drawer opens for a different target
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing?.id, adding, presetKey, loginId]);
+  }, [editing?.id, adding, presetKey, loginId, pageAccountId]);
 
   const closeForm = useCallback(() => {
     setParams((p) => {
@@ -125,6 +127,7 @@ function SubscriptionsView() {
       else next.set('tab', t);
       return next;
     });
+  const openAccount = (accountId: string) => setParams(new URLSearchParams({ account: accountId }));
   const openLogin = (entryId: string) => navigate(`/vault?entry=${encodeURIComponent(entryId)}`);
 
   /** toast only once the change is actually saved (encrypted) in this browser */
@@ -180,6 +183,7 @@ function SubscriptionsView() {
     const r = removeAccount(id);
     if (r === 'ok') {
       setAccountForm({ open: false, account: null });
+      if (pageAccountId === id) setTab('accounts'); // its page is gone
       void toastWhenSaved('Account removed — its logins stay in your vault');
     }
     return r;
@@ -210,12 +214,12 @@ function SubscriptionsView() {
         </div>
         <button
           type="button"
-          onClick={() => (tab === 'accounts' ? setAccountForm({ open: true, account: null }) : openAdd(null))}
+          onClick={() => (view.kind === 'accounts' ? setAccountForm({ open: true, account: null }) : openAdd(null))}
           disabled={!recordsWritable}
           className="bg-aurora flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[#04110B] transition-all hover:-translate-y-px hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
-          {tab === 'accounts' ? 'Add account' : 'Add subscription'}
+          {view.kind === 'accounts' ? 'Add account' : 'Add subscription'}
         </button>
       </div>
 
@@ -254,8 +258,22 @@ function SubscriptionsView() {
           subscriptions={subscriptions}
           accounts={accounts}
           today={today}
-          onOpen={openEdit}
+          onOpen={(sub) => openAccount(sub.accountId)}
           onShowList={() => setTab('subscriptions')}
+        />
+      ) : view.kind === 'account' ? (
+        <AccountPage
+          accountId={view.accountId}
+          accounts={accounts}
+          subscriptions={subscriptions}
+          entries={entries}
+          today={today}
+          canEdit={recordsWritable}
+          onBack={() => setTab('accounts')}
+          onEditAccount={(account) => setAccountForm({ open: true, account })}
+          onEditSubscription={openEdit}
+          onAddSubscription={() => openAdd(null)}
+          onOpenLogin={openLogin}
         />
       ) : tab !== 'accounts' ? (
         <SubscriptionList
@@ -272,6 +290,7 @@ function SubscriptionsView() {
           accounts={accounts}
           subscriptions={subscriptions}
           entries={entries}
+          onOpen={(account) => openAccount(account.id)}
           onEdit={(account) => setAccountForm({ open: true, account })}
           onAdd={() => setAccountForm({ open: true, account: null })}
           onOpenLogin={openLogin}

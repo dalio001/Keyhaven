@@ -22,12 +22,18 @@ export default function LinkedSubscriptions({ entry }: { entry: VaultEntry }) {
       <p className="text-eyebrow mb-1.5 text-kh-faint">Account &amp; subscriptions</p>
       {account ? (
         <div className="flex flex-col gap-2 rounded-xl border border-kh-line bg-kh-inset px-3.5 py-2.5">
-          <p className="text-sm text-kh-primary">{accountTitle(account)}</p>
+          <Link
+            to={`/subscriptions?account=${encodeURIComponent(account.id)}`}
+            className="self-start text-sm text-kh-primary underline-offset-2 hover:underline"
+            aria-label={`Open account ${accountTitle(account)}`}
+          >
+            {accountTitle(account)}
+          </Link>
           {subs.length === 0 && <p className="text-xs text-kh-faint">No subscriptions on this account.</p>}
           {subs.map((s) => (
             <Link
               key={s.id}
-              to={`/subscriptions?edit=${encodeURIComponent(s.id)}`}
+              to={`/subscriptions?account=${encodeURIComponent(account.id)}&edit=${encodeURIComponent(s.id)}`}
               className="flex items-center gap-2 rounded-lg border border-kh-line bg-kh-surface px-3 py-2 text-xs transition-colors hover:border-kh-lineStrong"
             >
               <CalendarClock className="h-3.5 w-3.5 shrink-0 text-kh-cyan" />

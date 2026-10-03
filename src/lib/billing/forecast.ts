@@ -72,6 +72,11 @@ export interface Overview {
   needsAttention: number;
 }
 
+/** soonest first; on the same day a trial's end before renewals */
+export function compareUpcoming(a: UpcomingCharge, b: UpcomingCharge): number {
+  return a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'trial' ? -1 : 1) || a.sub.id.localeCompare(b.sub.id);
+}
+
 /** counted in the figures: nothing unusable, and still renewing or in a trial */
 export function isBillable(state: SubscriptionState): boolean {
   return state.problems.length === 0 && (state.kind === 'renews' || state.kind === 'trial');
@@ -147,7 +152,7 @@ export function subscriptionOverview(subs: readonly Subscription[], today: Calen
     const [next] = occurrencesBetween(anchor, sub.interval, today, upcomingEnd, 1);
     if (next) upcoming.push({ sub, date: next, daysLeft: daysBetween(today, next)!, kind: state.kind === 'trial' ? 'trial' : 'renews' });
   }
-  upcoming.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'trial' ? -1 : 1) || a.sub.id.localeCompare(b.sub.id));
+  upcoming.sort(compareUpcoming);
 
   const monthCharges = chargesBetween(subs, month.start, month.end, today);
   const monthTotals: MonthTotal[] = totalsByCurrency(monthCharges).map((total) => {

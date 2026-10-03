@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { VaultProvider } from '@/providers/VaultProvider';
+import { VaultProvider, useVault } from '@/providers/VaultProvider';
 import Vault from '@/pages/Vault';
 import { BACKUP_SNOOZE_KEY } from '@/lib/backupReminder';
 import { LAST_EXPORT_KEY } from '@/lib/lastExport';
 import { cloneSampleEntries } from '@/lib/sampleData';
-import { addEntry, entry, freshVault } from '../helpers/controller';
+import { PW, addEntry, entry, freshVault, started } from '../helpers/controller';
 
 type Controller = Awaited<ReturnType<typeof freshVault>>['c'];
 
@@ -25,7 +25,10 @@ function renderVault(c: Controller) {
 }
 
 beforeEach(() => localStorage.clear());
-afterEach(() => localStorage.clear());
+afterEach(() => {
+  localStorage.clear();
+  vi.useRealTimers();
+});
 
 describe('backup reminder on the vault page (Phase 4)', () => {
   it('shows when you have your own data and never exported; Back up now opens Settings', async () => {
@@ -64,5 +67,39 @@ describe('backup reminder on the vault page (Phase 4)', () => {
     renderVault(c);
     await screen.findByText('My bank');
     expect(screen.queryByRole('status', { name: 'Backup reminder' })).toBeNull();
+  });
+
+  it('a snooze that runs out while the vault page stays open brings the reminder back', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'], now: new Date(2026, 9, 2, 12, 0) });
+    const { c } = await freshVault();
+    addEntry(c, entry('mine', { title: 'My bank' }));
+    localStorage.setItem(BACKUP_SNOOZE_KEY, new Date(Date.now() + 30_000).toISOString());
+    renderVault(c);
+    await screen.findByText('My bank');
+    expect(screen.queryByRole('status', { name: 'Backup reminder' })).toBeNull();
+    act(() => vi.advanceTimersByTime(61_000));
+    expect(screen.getByRole('status', { name: 'Backup reminder' })).toBeTruthy();
+  });
+
+  it('a new vault forgets the last export and snooze of an earlier vault', async () => {
+    const { c } = await started();
+    localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
+    localStorage.setItem(BACKUP_SNOOZE_KEY, new Date(Date.now() + 86_400_000).toISOString());
+    const api: { create?: (pw: string) => Promise<void> }[] = [];
+    function Probe() {
+      const { createVault } = useVault();
+      api.push({ create: createVault });
+      return null;
+    }
+    render(
+      <VaultProvider controller={c}>
+        <Probe />
+      </VaultProvider>,
+    );
+    await act(async () => {
+      await api.at(-1)!.create!(PW);
+    });
+    expect(localStorage.getItem(LAST_EXPORT_KEY)).toBeNull();
+    expect(localStorage.getItem(BACKUP_SNOOZE_KEY)).toBeNull();
   });
 });

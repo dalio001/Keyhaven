@@ -146,4 +146,22 @@ describe('Subscriptions Overview (Phase 4)', () => {
     renderAt(x.c, '/subscriptions');
     expect(await screen.findByText('Nothing to pay right now')).toBeTruthy();
   });
+
+  it('a row whose account cannot be shown opens the subscription; an odd plan never crashes the Overview', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 2, 12, 0) });
+    const x = await freshVault();
+    x.c.mutate((p) => ({
+      ...p,
+      accounts: [{ id: 'a-bad', service: 7 } as never, acct('a-ok', 'Synthetic Cloud')],
+      subscriptions: [
+        sub('hidden', 'a-bad', { billingAnchor: '2026-10-05' }),
+        sub('oddplan', 'a-ok', { billingAnchor: '2026-10-06', plan: { name: 'Plus' } as never }),
+      ],
+    }));
+    renderAt(x.c, '/subscriptions');
+    const rows = within(await screen.findByRole('list', { name: 'Upcoming renewals' })).getAllByRole('button');
+    expect(rows).toHaveLength(2);
+    fireEvent.click(rows[0]); // Unknown account
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
 });

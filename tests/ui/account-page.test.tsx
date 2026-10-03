@@ -113,4 +113,19 @@ describe('account pages (Phase 4)', () => {
     renderAt(c, '/subscriptions?account=nope');
     expect(await screen.findByText(/This account isn't in your vault/)).toBeTruthy();
   });
+
+  it('says when a subscription needs attention instead of silently leaving it out; an odd plan never crashes', async () => {
+    const x = await freshVault();
+    x.c.mutate((p) => ({
+      ...p,
+      accounts: [WORK],
+      subscriptions: [
+        sub('ok', 'a-work', { billingAnchor: '2026-10-15', plan: { name: 'Plus' } as never }),
+        sub('broken', 'a-work', { amountMinor: -1, billingAnchor: '2026-10-10' }),
+      ],
+    }));
+    renderAt(x.c, '/subscriptions?account=a-work');
+    expect(await screen.findByText(/1 subscription needs attention and isn't counted below/)).toBeTruthy();
+    expect(screen.getByText(/≈ \$20\.00/)).toBeTruthy();
+  });
 });

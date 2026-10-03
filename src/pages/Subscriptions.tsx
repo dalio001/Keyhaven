@@ -127,7 +127,10 @@ function SubscriptionsView() {
       else next.set('tab', t);
       return next;
     });
-  const openAccount = (accountId: string) => setParams(new URLSearchParams({ account: accountId }));
+  const openAccount = (accountId: string) => {
+    setParams(new URLSearchParams({ account: accountId }));
+    window.scrollTo({ top: 0 });
+  };
   const openLogin = (entryId: string) => navigate(`/vault?entry=${encodeURIComponent(entryId)}`);
 
   /** toast only once the change is actually saved (encrypted) in this browser */
@@ -258,7 +261,8 @@ function SubscriptionsView() {
           subscriptions={subscriptions}
           accounts={accounts}
           today={today}
-          onOpen={(sub) => openAccount(sub.accountId)}
+          // an account this version can't show (malformed) has no page: open the subscription instead
+          onOpen={(sub) => (accounts.some((a) => a.id === sub.accountId) ? openAccount(sub.accountId) : openEdit(sub))}
           onShowList={() => setTab('subscriptions')}
         />
       ) : view.kind === 'account' ? (

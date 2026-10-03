@@ -10,5 +10,8 @@ describe('links out of KeyHaven', () => {
       expect(safeExternalUrl(bad), String(bad)).toBeNull();
     }
     expect(displayHost('https://www.chatgpt.com/')).toBe('chatgpt.com');
+    // never an address carrying credentials
+    expect(safeExternalUrl('https://admin:hunter2@nas.example/billing')).toBeNull();
+    expect(safeExternalUrl('user@nas.example')).toBeNull();
   });
 });

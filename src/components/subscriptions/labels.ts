@@ -59,5 +59,6 @@ export function manageHint(sub: Subscription): string {
   if (sub.provider === 'apple') return 'Billed through Apple: on iPhone or iPad, open Settings → your name → Subscriptions.';
   if (sub.provider === 'google-play') return 'Billed through Google Play: open the Play Store → your profile → Payments & subscriptions → Subscriptions.';
   if (sub.provider === 'other') return `Billed through ${sub.providerOther || 'another provider'}: manage it where you signed up.`;
-  return '';
+  if (sub.provider === 'website') return '';
+  return 'Manage it where you signed up.'; // a provider this version doesn't know
 }

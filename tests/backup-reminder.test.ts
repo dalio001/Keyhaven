@@ -37,3 +37,17 @@ describe('backup reminder rules', () => {
     expect(hasOwnData([], 0, 1)).toBe(true);
   });
 });
+
+describe('backup reminder: review fixes', () => {
+  it('a sample login edited into a real one is your own data', () => {
+    const samples = cloneSampleEntries();
+    samples[1] = { ...samples[1], password: 'Synthetic-Real-Password-77!' };
+    expect(hasOwnData(samples, 0, 0)).toBe(true);
+  });
+
+  it('clock skew: a snooze longer than two weeks, or an export dated in the future, is not trusted', () => {
+    expect(backupReminder({ ...base, snoozedUntil: new Date(NOW + 365 * 86_400_000).toISOString() })).toEqual({ due: true, reason: 'never' });
+    expect(backupReminder({ ...base, lastExportAt: new Date(NOW + 30 * 86_400_000).toISOString() })).toEqual({ due: true, reason: 'never' });
+    expect(backupReminder({ ...base, lastExportAt: new Date(NOW + 3_600_000).toISOString() })).toEqual({ due: false });
+  });
+});

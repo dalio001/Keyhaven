@@ -54,6 +54,8 @@ import type {
 import type { MigratedFrom, VaultPayload } from '@/lib/store/format';
 import { createIdbStorage } from '@/lib/store/storage';
 import { requestPersistence } from '@/lib/persistence';
+import { LAST_EXPORT_KEY } from '@/lib/lastExport';
+import { BACKUP_SNOOZE_KEY } from '@/lib/backupReminder';
 import { createBroadcastTabChannel } from '@/lib/store/tabChannel';
 
 export type { SecondFactor, UnlockResult, VaultStatus } from '@/lib/store/controller';
@@ -359,6 +361,13 @@ export function VaultProvider({
       const r = await controller.createVault(password, { entries: opts?.seedSample ? cloneSampleEntries() : [] });
       if (r === 'exists') throw new Error('A vault already exists on this device — unlock it or delete it first.');
       if (r !== 'ok') throw new Error('This browser refused to save the vault — please try again.');
+      // a new vault has no backup yet: forget the last export / snooze of any earlier vault in this browser
+      try {
+        localStorage.removeItem(LAST_EXPORT_KEY);
+        localStorage.removeItem(BACKUP_SNOOZE_KEY);
+      } catch {
+        /* storage blocked */
+      }
     },
     [controller],
   );

@@ -90,7 +90,7 @@ export default function SubscriptionList({
               <span className="min-w-0 flex-1 basis-48">
                 <span className="flex items-center gap-2">
                   <span className="truncate text-[15px] font-semibold text-kh-primary">{accountTitle(account)}</span>
-                  {sub.plan && <span className="truncate text-sm text-kh-muted">{sub.plan}</span>}
+                  {typeof sub.plan === 'string' && sub.plan && <span className="truncate text-sm text-kh-muted">{sub.plan}</span>}
                 </span>
                 <span className="block truncate text-sm text-kh-faint">
                   {[account?.email, providerText(sub)].filter(Boolean).join(' · ')}

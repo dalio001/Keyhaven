@@ -189,5 +189,8 @@ describe('date ranges (Phase 4)', () => {
     expect(formatMonthYear('2026-10-01', 'en-US')).toBe('October 2026');
     expect(formatMonthYear('2028-02-29', 'en-US')).toBe('February 2028');
     expect(formatMonthYear('bad', 'en-US')).toBe('bad');
+    // the window is a Gregorian month, so its name is too — even where the locale's calendar differs
+    expect(formatMonthYear('2026-10-01', 'fa-IR')).toBe(new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: 'long', timeZone: 'UTC', calendar: 'gregory' }).format(Date.UTC(2026, 9, 1)));
+    expect(formatMonthYear('2026-10-01', 'fa-IR')).not.toBe(new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: 'long', timeZone: 'UTC' }).format(Date.UTC(2026, 9, 1)));
   });
 });

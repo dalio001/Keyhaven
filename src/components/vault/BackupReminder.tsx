@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { useNow } from '@/hooks/useToday';
 import { Link } from 'react-router';
 import { FileDown } from 'lucide-react';
 import { backupReminder, hasOwnData, readSnooze, snoozeReminder } from '@/lib/backupReminder';
@@ -14,7 +15,7 @@ import { useVault } from '@/providers/VaultProvider';
 export default function BackupReminder() {
   const { entries, accounts, subscriptions, save } = useVault();
   const [snoozedUntil, setSnoozedUntil] = useState(() => readSnooze());
-  const [now] = useState(() => Date.now());
+  const now = useNow(); // keeps ticking, so a snooze or the 30 days can run out while the page stays open
   const reminder = backupReminder({
     now,
     lastExportAt: readLastExport(),
@@ -30,7 +31,7 @@ export default function BackupReminder() {
       className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-kh-violet/30 bg-kh-violet/10 px-4 py-3 text-sm text-kh-primary"
     >
       <FileDown className="h-4 w-4 shrink-0 text-kh-violet" aria-hidden />
-      <span className="min-w-0 flex-1 basis-60">
+      <span className="min-w-0 flex-1">
         {reminder.reason === 'never'
           ? "You haven't exported an encrypted backup yet — your vault lives only in this browser."
           : `Your last encrypted backup is ${reminder.days} days old and your vault has changed since.`}

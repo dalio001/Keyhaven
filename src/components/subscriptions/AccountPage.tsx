@@ -77,8 +77,8 @@ export default function AccountPage({
       <header className="flex flex-wrap items-start gap-4">
         <LetterAvatar name={account.service || '?'} size={48} />
         <div className="min-w-0 flex-1 basis-56">
-          <h3 className="font-display text-2xl font-semibold text-kh-primary">{accountTitle(account)}</h3>
-          <p className="mt-0.5 text-sm text-kh-muted">{account.email || 'No email saved'}</p>
+          <h3 className="break-words font-display text-2xl font-semibold text-kh-primary">{accountTitle(account)}</h3>
+          <p className="mt-0.5 break-all text-sm text-kh-muted">{account.email || 'No email saved'}</p>
           {account.notes && <p className="mt-2 max-w-xl whitespace-pre-wrap text-sm text-kh-faint">{account.notes}</p>}
         </div>
         <button
@@ -90,6 +90,13 @@ export default function AccountPage({
           <Pencil className="h-3.5 w-3.5" /> Edit account
         </button>
       </header>
+
+      {overview.needsAttention > 0 && (
+        <p className="rounded-xl border border-kh-warning/30 bg-kh-warning/10 px-4 py-3 text-sm text-kh-warning">
+          {overview.needsAttention === 1 ? "1 subscription needs attention and isn't" : `${overview.needsAttention} subscriptions need attention and aren't`}{' '}
+          counted below.
+        </p>
+      )}
 
       {overview.averages.length > 0 && (
         <section aria-label="What this account costs" className="flex flex-wrap gap-3">
@@ -133,7 +140,7 @@ export default function AccountPage({
         <h4 id="acct-manage" className={SECTION_TITLE}>
           Where it's managed
         </h4>
-        {providers.length === 0 && <p className="text-sm text-kh-muted">No active subscriptions to manage.</p>}
+        {live.length === 0 && <p className="text-sm text-kh-muted">No active subscriptions to manage.</p>}
         {providers.includes('website') &&
           (website ? (
             <a
@@ -171,9 +178,9 @@ export default function AccountPage({
                 <button
                   type="button"
                   onClick={() => onOpenLogin(e.id)}
-                  className="flex items-center gap-1.5 rounded-full border border-kh-line bg-kh-inset px-3 py-1 text-sm text-kh-muted transition-colors hover:text-kh-primary"
+                  className="flex max-w-full items-center gap-1.5 rounded-full border border-kh-line bg-kh-inset px-3 py-1 text-sm text-kh-muted transition-colors hover:text-kh-primary"
                 >
-                  <KeyRound className="h-3.5 w-3.5" /> {e.title} — {e.username}
+                  <KeyRound className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{e.title} — {e.username}</span>
                 </button>
               </li>
             ))}

@@ -216,5 +216,8 @@ export function formatCalendarDate(value: CalendarDate, locale?: string): string
 export function formatMonthYear(value: CalendarDate, locale?: string): string {
   const p = parseCalendarDate(value);
   if (!p) return value;
-  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', timeZone: 'UTC' }).format(dayNumber(p) * 86_400_000);
+  // Gregorian months (the month window is Gregorian), whatever calendar the locale uses
+  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', timeZone: 'UTC', calendar: 'gregory' }).format(
+    dayNumber(p) * 86_400_000,
+  );
 }

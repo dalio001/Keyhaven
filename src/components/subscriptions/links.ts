@@ -10,7 +10,8 @@ export function safeExternalUrl(website: string | undefined): string | null {
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
   try {
     const url = new URL(withScheme);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname ? url.href : null;
+    const web = url.protocol === 'https:' || url.protocol === 'http:';
+    return web && url.hostname && !url.username && !url.password ? url.href : null; // never a user:pass@ address
   } catch {
     return null;
   }

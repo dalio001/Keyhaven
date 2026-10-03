@@ -182,19 +182,19 @@ function UpcomingRow({ u, title, service, onOpen }: { u: UpcomingCharge; title: 
         onClick={() => onOpen(u.sub)}
         className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-kh-line bg-kh-surface px-4 py-3 text-left transition-colors hover:border-kh-lineStrong"
       >
-        <span className="w-28 shrink-0 text-sm text-kh-primary">
+        <span className="w-28 shrink-0 text-sm text-kh-primary max-sm:w-full">
           {formatCalendarDate(u.date)}
-          <span className="block text-xs text-kh-faint">{relativeDays(u.daysLeft)}</span>
+          <span className="block text-xs text-kh-faint max-sm:ml-1.5 max-sm:inline">{relativeDays(u.daysLeft)}</span>
         </span>
         <LetterAvatar name={service} size={28} />
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-kh-primary">
           {title}
-          {u.sub.plan && <span className="ml-1.5 font-normal text-kh-muted">{u.sub.plan}</span>}
+          {typeof u.sub.plan === 'string' && u.sub.plan && <span className="ml-1.5 font-normal text-kh-muted">{u.sub.plan}</span>}
           {u.kind === 'trial' && (
             <span className="ml-2 rounded-full border border-kh-cyan/30 bg-kh-cyan/10 px-2 py-0.5 text-[11px] font-normal text-kh-cyan">Trial ends</span>
           )}
         </span>
-        <span className={`${MONEY} text-sm text-kh-primary max-sm:basis-full max-sm:pl-[calc(7rem+0.75rem)]`}>{priceText(u.sub)}</span>
+        <span className={`${MONEY} text-sm text-kh-primary max-sm:basis-full max-sm:pl-10`}>{priceText(u.sub)}</span>
       </button>
     </li>
   );

@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useSearchParams } from 'react-router';
 import { MotionConfig, motion, useReducedMotion } from 'framer-motion';
 import { Plus, SearchX } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
@@ -49,6 +49,7 @@ const WELCOME_KEY = 'kh-vault-welcomed';
 
 export default function Vault() {
   const { status } = useVault();
+  const { pathname, search } = useLocation();
 
   // next unlock session should greet again
   useEffect(() => {
@@ -66,7 +67,8 @@ export default function Vault() {
     );
   }
   if (status !== 'unlocked') {
-    return <Navigate to="/unlock" replace />;
+    // remember the link (/vault?new=1 …) so unlocking lands where it pointed
+    return <Navigate to="/unlock" replace state={{ next: pathname + search }} />;
   }
   return <VaultDashboard />;
 }

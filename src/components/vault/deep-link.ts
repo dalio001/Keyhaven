@@ -45,3 +45,13 @@ export function parseVaultLink(params: URLSearchParams): VaultLink {
 export function hasVaultLinkParams(params: URLSearchParams): boolean {
   return VAULT_LINK_PARAMS.some((k) => params.has(k));
 }
+
+/**
+ * Where to go after unlocking: the vault link the locked vault redirected
+ * from (carried in router state, so `?new=1` and friends survive the unlock),
+ * or plain /vault. Only /vault links are accepted — never another page or site.
+ */
+export function vaultReturnPath(state: unknown): string {
+  const next = typeof state === 'object' && state !== null ? (state as { next?: unknown }).next : undefined;
+  return typeof next === 'string' && /^\/vault(\?[^#]*)?$/.test(next) ? next : '/vault';
+}

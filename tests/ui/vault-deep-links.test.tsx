@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { VaultProvider } from '@/providers/VaultProvider';
 import Vault from '@/pages/Vault';
+import Unlock from '@/pages/Unlock';
 import { clearSecret, offerSecret } from '@/lib/handoff';
-import { addEntry, entry, freshVault } from '../helpers/controller';
+import { PW, addEntry, entry, freshVault } from '../helpers/controller';
 
 const SECRET = 'Synthetic-Gen-Secret-42';
 const seen: string[] = [];
@@ -70,5 +71,31 @@ describe('links into the vault open what they promise', () => {
     await openVaultAt('/vault?filter=favorites');
     expect(await screen.findByRole('button', { name: 'Open GitHub details' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Open Netflix details' })).toBeNull();
+  });
+});
+
+describe('links into a locked vault survive unlocking', () => {
+  it('/vault?new=1 reached while locked: after unlock, "New login" opens (with a handed-over password, if any)', async () => {
+    const x = await freshVault();
+    addEntry(x.c, entry('nf-05', { title: 'Netflix' }));
+    await x.c.lock();
+    offerSecret(SECRET);
+    render(
+      <VaultProvider controller={x.c}>
+        <MemoryRouter initialEntries={['/vault?new=1']}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/vault" element={<Vault />} />
+            <Route path="/unlock" element={<Unlock />} />
+          </Routes>
+        </MemoryRouter>
+      </VaultProvider>,
+    );
+    fireEvent.change(await screen.findByLabelText('Master password'), { target: { value: PW } });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock vault' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New login' }, { timeout: 15_000 });
+    expect((within(dialog).getByLabelText('Password') as HTMLInputElement).value).toBe(SECRET);
+    await waitFor(() => expect(seen.at(-1)).toBe('/vault'));
+    expect(seen.some((u) => u.includes(SECRET))).toBe(false);
   });
 });

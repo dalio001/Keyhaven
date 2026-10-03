@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AlertTriangle, Plus } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
 import SettingsShell from '@/components/settings/SettingsShell';
@@ -28,6 +28,7 @@ import type { AccountDraft, SaveSubscriptionInput } from '@/providers/VaultProvi
 
 export default function Subscriptions() {
   const { status } = useVault();
+  const { pathname, search } = useLocation();
   if (status === 'loading') {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
@@ -38,7 +39,8 @@ export default function Subscriptions() {
   }
   // same guard as the other app pages: nothing to unlock → create; locked → /unlock
   if (status === 'no-vault') return <Navigate to="/unlock?mode=create" replace />;
-  if (status !== 'unlocked') return <Navigate to="/unlock" replace />;
+  // remember the link (?account=, ?edit= …) so unlocking lands where it pointed
+  if (status !== 'unlocked') return <Navigate to="/unlock" replace state={{ next: pathname + search }} />;
   return (
     <SettingsShell title="Subscriptions">
       <SubscriptionsView />

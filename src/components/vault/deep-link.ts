@@ -47,11 +47,12 @@ export function hasVaultLinkParams(params: URLSearchParams): boolean {
 }
 
 /**
- * Where to go after unlocking: the vault link the locked vault redirected
- * from (carried in router state, so `?new=1` and friends survive the unlock),
- * or plain /vault. Only /vault links are accepted — never another page or site.
+ * Where to go after unlocking: the link a locked page redirected from
+ * (carried in router state, so `?new=1`, `?account=` and friends survive the
+ * unlock), or plain /vault. Only /vault and /subscriptions links are accepted
+ * — never another page or site.
  */
 export function vaultReturnPath(state: unknown): string {
   const next = typeof state === 'object' && state !== null ? (state as { next?: unknown }).next : undefined;
-  return typeof next === 'string' && /^\/vault(\?[^#]*)?$/.test(next) ? next : '/vault';
+  return typeof next === 'string' && /^\/(vault|subscriptions)(\?[^#]*)?$/.test(next) ? next : '/vault';
 }

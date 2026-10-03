@@ -8,6 +8,7 @@
 import { zxcvbn } from 'zxcvbn-ts';
 import type { VaultCategory, VaultEntry } from '@/lib/vault';
 import { base32Encode } from '@/lib/totp';
+import { analyzeVault } from '@/components/security/analysis';
 
 /* ------------------------------------------------------------------ */
 /* entry extension fields (stored encrypted inside the vault blob)     */
@@ -117,7 +118,8 @@ export interface VaultStats {
   score: number;
 }
 
-export function computeStats(entries: VaultEntry[], strength: StrengthMap): VaultStats {
+/** counts for the stat chips; the score is Watchtower's (same penalties, same ignored checks) */
+export function computeStats(entries: VaultEntry[], strength: StrengthMap, ignored: Set<string>): VaultStats {
   const reused = reusedPasswords(entries);
   let weak = 0;
   let reusedCount = 0;
@@ -129,8 +131,7 @@ export function computeStats(entries: VaultEntry[], strength: StrengthMap): Vaul
     if (e.breached) breached++;
     if (isOld(e)) old++;
   }
-  // Calibrated so the 12-entry sample dataset scores 78 (design.md §7).
-  const score = Math.max(0, Math.min(100, 100 - weak * 4 - reusedCount * 4 - breached * 6));
+  const { score } = analyzeVault(entries, ignored, strength);
   return { total: entries.length, weak, reused: reusedCount, breached, old, score };
 }
 

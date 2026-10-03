@@ -24,11 +24,12 @@ import IssueGroups from '@/components/security/IssueGroups';
 import BreachScan from '@/components/security/BreachScan';
 import SecurityTimeline from '@/components/security/SecurityTimeline';
 import Recommendations from '@/components/security/Recommendations';
+import { readLastExport } from '@/lib/lastExport';
 import type { CheckType } from '@/components/security/analysis';
 import { GROUP_IDS, analyzeVault, ignoreKey, loadIgnored, saveIgnored } from '@/components/security/analysis';
 
 export default function Security() {
-  const { status, entries, totpEnabled } = useVault();
+  const { status, entries, totpEnabled, settings } = useVault();
 
   const [ignored, setIgnored] = useState<Set<string>>(() => loadIgnored());
   const [highlighted, setHighlighted] = useState<CheckType | null>(null);
@@ -117,7 +118,7 @@ export default function Security() {
         <SecurityTimeline entries={entries} />
 
         {/* §5 — recommendations */}
-        <Recommendations />
+        <Recommendations autoLockMinutes={settings.autoLockMinutes} lastExportAt={readLastExport()} entries={entries} />
       </motion.div>
     </SecurityShell>
   );

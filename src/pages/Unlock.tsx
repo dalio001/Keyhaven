@@ -7,12 +7,13 @@
  * blur, Ken Burns drift), the center-stage 340px VaultRing whose mint arc
  * fills one third per wizard step, the glass card with AnimatePresence
  * cross-slide transitions, the success ceremony (dash sweep → lock flip →
- * iris-open → /vault), failed-attempt danger flashes, and the route guards
- * (already-unlocked → /vault; no-vault → create prompt).
+ * iris-open → /vault, or the vault link that redirected here), failed-attempt
+ * danger flashes, and the route guards (already-unlocked → /vault; no-vault →
+ * create prompt).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AnimatePresence, animate, motion } from 'framer-motion';
 import { AlertTriangle, Check, Loader2, Lock, RefreshCw, Unlock as UnlockIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ import UnlockMode from '@/components/unlock/UnlockMode';
 import CreateWizard from '@/components/unlock/CreateWizard';
 import RestoreBackupPanel from '@/components/unlock/RestoreBackupPanel';
 import { useVault } from '@/providers/VaultProvider';
+import { vaultReturnPath } from '@/components/vault/deep-link';
 import { cn } from '@/lib/utils';
 
 const EXPO = [0.16, 1, 0.3, 1] as [number, number, number, number];
@@ -100,6 +102,9 @@ export default function Unlock() {
   const [confirmWipe, setConfirmWipe] = useState('');
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  // the vault link that sent us here while locked (e.g. a bookmarked /vault?new=1), read once
+  const location = useLocation();
+  const [next] = useState(() => vaultReturnPath(location.state));
   const mode: 'unlock' | 'create' = params.get('mode') === 'create' ? 'create' : 'unlock';
 
   const [ceremony, setCeremony] = useState<'unlock' | 'create' | null>(null);
@@ -119,9 +124,9 @@ export default function Unlock() {
      just created it, or the ceremony is playing) */
   useEffect(() => {
     if (status === 'unlocked' && !createdHereRef.current && !ceremony) {
-      navigate('/vault', { replace: true });
+      navigate(next, { replace: true });
     }
-  }, [status, ceremony, navigate]);
+  }, [status, ceremony, navigate, next]);
 
   /* ring fills one third per completed wizard step */
   useEffect(() => {
@@ -150,14 +155,14 @@ export default function Unlock() {
       }
     }, irisDelay);
     const t2 = window.setTimeout(() => {
-      navigate('/vault', { state: { welcome: ceremony } });
+      navigate(next, { state: { welcome: ceremony } });
     }, irisDelay + 600);
     return () => {
       controls.stop();
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [ceremony, navigate]);
+  }, [ceremony, navigate, next]);
 
   const flashDanger = useCallback(() => {
     setDangerFlash(true);

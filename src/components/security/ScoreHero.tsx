@@ -70,7 +70,7 @@ export default function ScoreHero({
       : issueCount === 0
         ? `No weak, reused, old or breached passwords across ${plural(total, 'login')}. Keep it up — a fresh scan never hurts.`
         : score < 90
-          ? `${plural(fixesToNinety, 'fix')} would push you past 90. Strongest area: unique passwords on ${uniqueCount} of ${total} logins.`
+          ? `${plural(fixesToNinety, 'fix', 'fixes')} would push you past 90. Strongest area: unique passwords on ${uniqueCount} of ${total} logins.`
           : `Strongest area: unique passwords on ${uniqueCount} of ${total} logins.`;
 
   const checklist: {

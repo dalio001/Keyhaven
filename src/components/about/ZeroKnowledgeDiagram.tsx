@@ -116,20 +116,24 @@ export default function ZeroKnowledgeDiagram() {
   /* ---------------- reduced motion: stacked static panels ---------------- */
   if (reduced) {
     return (
-      <section ref={sectionRef} className="border-t border-kh-line py-24">
-        <div className="mx-auto max-w-[720px] space-y-8 px-6">
-          {BEATS.map((b, i) => (
-            <div key={b.title} className="rounded-2xl border border-kh-line bg-kh-inset p-8">
-              <span className="font-mono text-xs text-kh-mint">0{i + 1}</span>
-              <h3 className="mt-3 font-display text-2xl font-semibold text-kh-primary">{b.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-kh-muted">{b.caption}</p>
-              {i === 2 && (
-                <p className="mt-4 break-all font-mono text-sm text-kh-mint">{CIPHER}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+      // GSAP pins the <section> by moving it into a spacer div; this React-owned
+      // wrapper keeps React able to remove the page when navigating away (KH-06).
+      <div>
+        <section ref={sectionRef} className="border-t border-kh-line py-24">
+          <div className="mx-auto max-w-[720px] space-y-8 px-6">
+            {BEATS.map((b, i) => (
+              <div key={b.title} className="rounded-2xl border border-kh-line bg-kh-inset p-8">
+                <span className="font-mono text-xs text-kh-mint">0{i + 1}</span>
+                <h3 className="mt-3 font-display text-2xl font-semibold text-kh-primary">{b.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-kh-muted">{b.caption}</p>
+                {i === 2 && (
+                  <p className="mt-4 break-all font-mono text-sm text-kh-mint">{CIPHER}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     );
   }
 
@@ -156,158 +160,162 @@ export default function ZeroKnowledgeDiagram() {
   const keyPulse = b4 > 0 ? 0.6 + 0.4 * Math.sin(p * 60) : 0;
 
   return (
-    <section ref={sectionRef} className="relative border-t border-kh-line">
-      <div className="flex h-[100dvh] flex-col items-center justify-center overflow-hidden px-6">
-        <p className="font-mono text-eyebrow text-kh-faint">ZERO-KNOWLEDGE, IN FOUR BEATS</p>
+    // GSAP pins the <section> by moving it into a spacer div; this React-owned
+    // wrapper keeps React able to remove the page when navigating away (KH-06).
+    <div>
+      <section ref={sectionRef} className="relative border-t border-kh-line">
+        <div className="flex h-[100dvh] flex-col items-center justify-center overflow-hidden px-6">
+          <p className="font-mono text-eyebrow text-kh-faint">ZERO-KNOWLEDGE, IN FOUR BEATS</p>
 
-        {/* beat title (cross-fade) */}
-        <div className="relative mt-4 h-[44px] w-full max-w-[720px]">
-          {BEATS.map((b, i) => (
-            <h2
-              key={b.title}
-              className="absolute inset-0 text-center font-display text-[clamp(22px,3.4vw,34px)] font-bold tracking-[-0.015em] text-kh-primary transition-all duration-300"
-              style={{
-                opacity: beat === i ? 1 : 0,
-                transform: `translateY(${beat === i ? 0 : 12}px)`,
-              }}
-            >
-              {b.title}
-            </h2>
-          ))}
-        </div>
-
-        {/* diagram stage */}
-        <div className="relative mt-4 w-full max-w-[1000px]">
-          <svg viewBox="0 0 1000 420" className="w-full" role="img" aria-label="Diagram: your password derives a key in your browser; only ciphertext reaches storage.">
-            <defs>
-              <linearGradient id="zk-pipe" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#35F0A1" />
-                <stop offset="55%" stopColor="#38E1FF" />
-                <stop offset="100%" stopColor="#8B7CFF" />
-              </linearGradient>
-            </defs>
-
-            {/* ===== zone labels ===== */}
-            <text x={130} y={52} textAnchor="middle" fill="#5C6B84" fontSize={11} letterSpacing={2} fontFamily={MONO}>YOU</text>
-            <text x={520} y={52} textAnchor="middle" fill="#5C6B84" fontSize={11} letterSpacing={2} fontFamily={MONO}>YOUR BROWSER</text>
-            <text x={870} y={52} textAnchor="middle" fill="#5C6B84" fontSize={11} letterSpacing={2} fontFamily={MONO}>STORAGE · THIS DEVICE</text>
-
-            {/* ===== YOU: person glyph ===== */}
-            <circle cx={130} cy={100} r={18} fill="none" stroke="#93A1B8" strokeWidth={2} />
-            <path d="M98 162 C98 136 112 126 130 126 C148 126 162 136 162 162" fill="none" stroke="#93A1B8" strokeWidth={2} strokeLinecap="round" />
-
-            {/* master password field */}
-            <rect x={50} y={195} width={160} height={46} rx={10} fill="#030509" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
-            <text x={130} y={224} textAnchor="middle" fill="#EAF0FA" fontSize={16} letterSpacing={3} fontFamily={MONO}>{bullets}</text>
-            {beat === 0 && (
-              <rect x={136 + bullets.length * 9} y={206} width={2} height={22} fill="#35F0A1" className="animate-caret-blink" />
-            )}
-            <text x={130} y={262} textAnchor="middle" fill="#5C6B84" fontSize={10} fontFamily={MONO}>master password — never stored</text>
-
-            {/* the only key lives here */}
-            <KeyGlyph x={130} y={330} opacity={b4 > 0 ? 1 : 0.25} glow={keyPulse} />
-            <text x={130} y={380} textAnchor="middle" fill={b4 > 0 ? '#35F0A1' : '#5C6B84'} fontSize={10} fontFamily={MONO}>the only key</text>
-
-            {/* ===== pipe 1 (You → Browser) ===== */}
-            <line x1={215} y1={218} x2={395} y2={218} stroke="rgba(148,178,255,.14)" strokeWidth={2} />
-            <line x1={215} y1={218} x2={395} y2={218} stroke="url(#zk-pipe)" strokeWidth={2} strokeDasharray="4 16" strokeDashoffset={-p * 260} opacity={0.6} />
-            <circle cx={packet1X} cy={218} r={5.5} fill="#EAF0FA" opacity={packet1Opacity} />
-
-            {/* ===== BROWSER box ===== */}
-            <rect x={400} y={90} width={240} height={300} rx={16} fill="#0A0F1C" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
-            <rect x={400} y={90} width={240} height={300} rx={16} fill="none" stroke="#35F0A1" strokeWidth={1.5} opacity={browserGlow} />
-
-            {/* KDF readout */}
-            <Gear x={460} y={150} rotation={b2 * 540} opacity={beat >= 1 ? 1 : 0.2} />
-            <text x={495} y={146} fill="#38E1FF" fontSize={12} fontFamily={MONO} opacity={beat >= 1 ? 1 : 0}>PBKDF2-SHA256</text>
-            <text x={495} y={168} fill="#5C6B84" fontSize={11} fontFamily={MONO} opacity={beat >= 1 ? 1 : 0}>
-              iter {iterations}
-            </text>
-            <text x={420} y={205} fill="#FFB84D" fontSize={11} fontFamily={MONO} opacity={b2 > 0.4 ? 1 : 0}>
-              key{' '}
-              {HEX_KEY.split('').map((c, i) => (i < hexSettle ? c : GLYPHS[(i * 5 + Math.floor(b2 * 30)) % GLYPHS.length])).join('')}
-            </text>
-
-            {/* demo entry card */}
-            <g opacity={cardIn} transform={`translate(0 ${24 * (1 - cardIn)})`}>
-              <rect x={425} y={225} width={190} height={92} rx={10} fill="#030509" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
-              <rect x={425} y={225} width={190} height={92} rx={10} fill="none" stroke="#35F0A1" strokeWidth={1.5} opacity={scrambleT >= 1 ? 0.8 : scrambleT * 0.3} />
-              <text x={441} y={255} fill="#EAF0FA" fontSize={13} fontFamily={MONO} opacity={1 - scrambleT}>Netflix</text>
-              <text x={441} y={278} fill="#93A1B8" fontSize={11} fontFamily={MONO} opacity={1 - scrambleT}>alex@mail.com</text>
-              <text x={441} y={268} fill="#35F0A1" fontSize={12} fontFamily={MONO} opacity={scrambleT > 0 ? 1 : 0}>
-                {CIPHER.split('').map((c, i) => (i < cipherSettle ? c : GLYPHS[(i * 7 + Math.floor(scrambleT * 40)) % GLYPHS.length])).join('')}
-              </text>
-              <text x={441} y={300} fill="#5C6B84" fontSize={9} fontFamily={MONO} opacity={scrambleT >= 1 ? 1 : 0}>
-                sealed · AES-256-GCM
-              </text>
-            </g>
-            <text x={520} y={355} textAnchor="middle" fill="#38E1FF" fontSize={10} fontFamily={MONO} opacity={beat === 2 ? 1 : 0}>
-              AES-256-GCM
-            </text>
-
-            {/* ===== pipe 2 (Browser → Storage) ===== */}
-            <line x1={645} y1={218} x2={775} y2={218} stroke="rgba(148,178,255,.14)" strokeWidth={2} />
-            <line x1={645} y1={218} x2={775} y2={218} stroke="url(#zk-pipe)" strokeWidth={2} strokeDasharray="4 16" strokeDashoffset={-p * 260} opacity={0.6} />
-            <circle cx={packet3X} cy={218} r={5.5} fill="#35F0A1" opacity={packet3Opacity} />
-
-            {/* ===== STORAGE cylinder ===== */}
-            <g opacity={0.55 + 0.45 * clamp01(b4 * 2)}>
-              <path d="M800 160 L800 300 A70 18 0 0 0 940 300 L940 160" fill="#101828" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
-              <ellipse cx={870} cy={160} rx={70} ry={18} fill="#101828" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
-            </g>
-            {STORAGE_ROWS.map((row, i) => (
-              <text
-                key={row}
-                x={812}
-                y={205 + i * 26}
-                fill="#38E1FF"
-                fontSize={10}
-                fontFamily={MONO}
-                opacity={b4 > i * 0.22 ? 0.55 : 0}
-              >
-                {row}
-              </text>
-            ))}
-            <LockGlyph x={870} y={128} scale={lockScale} />
-            <text x={870} y={352} textAnchor="middle" fill="#5C6B84" fontSize={10} fontFamily={MONO} opacity={b4 > 0.5 ? 1 : 0}>
-              only ciphertext, ever
-            </text>
-          </svg>
-
-          {/* beat progress dots */}
-          <div className="absolute -left-2 top-1/2 hidden -translate-y-1/2 flex-col gap-2.5 md:flex" aria-hidden>
+          {/* beat title (cross-fade) */}
+          <div className="relative mt-4 h-[44px] w-full max-w-[720px]">
             {BEATS.map((b, i) => (
-              <span
+              <h2
                 key={b.title}
-                className={cn(
-                  'h-2 w-2 rounded-full transition-colors duration-300',
-                  p * 4 > i ? 'bg-kh-mint' : 'bg-kh-elevated',
-                )}
-              />
+                className="absolute inset-0 text-center font-display text-[clamp(22px,3.4vw,34px)] font-bold tracking-[-0.015em] text-kh-primary transition-all duration-300"
+                style={{
+                  opacity: beat === i ? 1 : 0,
+                  transform: `translateY(${beat === i ? 0 : 12}px)`,
+                }}
+              >
+                {b.title}
+              </h2>
+            ))}
+          </div>
+
+          {/* diagram stage */}
+          <div className="relative mt-4 w-full max-w-[1000px]">
+            <svg viewBox="0 0 1000 420" className="w-full" role="img" aria-label="Diagram: your password derives a key in your browser; only ciphertext reaches storage.">
+              <defs>
+                <linearGradient id="zk-pipe" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#35F0A1" />
+                  <stop offset="55%" stopColor="#38E1FF" />
+                  <stop offset="100%" stopColor="#8B7CFF" />
+                </linearGradient>
+              </defs>
+
+              {/* ===== zone labels ===== */}
+              <text x={130} y={52} textAnchor="middle" fill="#5C6B84" fontSize={11} letterSpacing={2} fontFamily={MONO}>YOU</text>
+              <text x={520} y={52} textAnchor="middle" fill="#5C6B84" fontSize={11} letterSpacing={2} fontFamily={MONO}>YOUR BROWSER</text>
+              <text x={870} y={52} textAnchor="middle" fill="#5C6B84" fontSize={11} letterSpacing={2} fontFamily={MONO}>STORAGE · THIS DEVICE</text>
+
+              {/* ===== YOU: person glyph ===== */}
+              <circle cx={130} cy={100} r={18} fill="none" stroke="#93A1B8" strokeWidth={2} />
+              <path d="M98 162 C98 136 112 126 130 126 C148 126 162 136 162 162" fill="none" stroke="#93A1B8" strokeWidth={2} strokeLinecap="round" />
+
+              {/* master password field */}
+              <rect x={50} y={195} width={160} height={46} rx={10} fill="#030509" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
+              <text x={130} y={224} textAnchor="middle" fill="#EAF0FA" fontSize={16} letterSpacing={3} fontFamily={MONO}>{bullets}</text>
+              {beat === 0 && (
+                <rect x={136 + bullets.length * 9} y={206} width={2} height={22} fill="#35F0A1" className="animate-caret-blink" />
+              )}
+              <text x={130} y={262} textAnchor="middle" fill="#5C6B84" fontSize={10} fontFamily={MONO}>master password — never stored</text>
+
+              {/* the only key lives here */}
+              <KeyGlyph x={130} y={330} opacity={b4 > 0 ? 1 : 0.25} glow={keyPulse} />
+              <text x={130} y={380} textAnchor="middle" fill={b4 > 0 ? '#35F0A1' : '#5C6B84'} fontSize={10} fontFamily={MONO}>the only key</text>
+
+              {/* ===== pipe 1 (You → Browser) ===== */}
+              <line x1={215} y1={218} x2={395} y2={218} stroke="rgba(148,178,255,.14)" strokeWidth={2} />
+              <line x1={215} y1={218} x2={395} y2={218} stroke="url(#zk-pipe)" strokeWidth={2} strokeDasharray="4 16" strokeDashoffset={-p * 260} opacity={0.6} />
+              <circle cx={packet1X} cy={218} r={5.5} fill="#EAF0FA" opacity={packet1Opacity} />
+
+              {/* ===== BROWSER box ===== */}
+              <rect x={400} y={90} width={240} height={300} rx={16} fill="#0A0F1C" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
+              <rect x={400} y={90} width={240} height={300} rx={16} fill="none" stroke="#35F0A1" strokeWidth={1.5} opacity={browserGlow} />
+
+              {/* KDF readout */}
+              <Gear x={460} y={150} rotation={b2 * 540} opacity={beat >= 1 ? 1 : 0.2} />
+              <text x={495} y={146} fill="#38E1FF" fontSize={12} fontFamily={MONO} opacity={beat >= 1 ? 1 : 0}>PBKDF2-SHA256</text>
+              <text x={495} y={168} fill="#5C6B84" fontSize={11} fontFamily={MONO} opacity={beat >= 1 ? 1 : 0}>
+                iter {iterations}
+              </text>
+              <text x={420} y={205} fill="#FFB84D" fontSize={11} fontFamily={MONO} opacity={b2 > 0.4 ? 1 : 0}>
+                key{' '}
+                {HEX_KEY.split('').map((c, i) => (i < hexSettle ? c : GLYPHS[(i * 5 + Math.floor(b2 * 30)) % GLYPHS.length])).join('')}
+              </text>
+
+              {/* demo entry card */}
+              <g opacity={cardIn} transform={`translate(0 ${24 * (1 - cardIn)})`}>
+                <rect x={425} y={225} width={190} height={92} rx={10} fill="#030509" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
+                <rect x={425} y={225} width={190} height={92} rx={10} fill="none" stroke="#35F0A1" strokeWidth={1.5} opacity={scrambleT >= 1 ? 0.8 : scrambleT * 0.3} />
+                <text x={441} y={255} fill="#EAF0FA" fontSize={13} fontFamily={MONO} opacity={1 - scrambleT}>Netflix</text>
+                <text x={441} y={278} fill="#93A1B8" fontSize={11} fontFamily={MONO} opacity={1 - scrambleT}>alex@mail.com</text>
+                <text x={441} y={268} fill="#35F0A1" fontSize={12} fontFamily={MONO} opacity={scrambleT > 0 ? 1 : 0}>
+                  {CIPHER.split('').map((c, i) => (i < cipherSettle ? c : GLYPHS[(i * 7 + Math.floor(scrambleT * 40)) % GLYPHS.length])).join('')}
+                </text>
+                <text x={441} y={300} fill="#5C6B84" fontSize={9} fontFamily={MONO} opacity={scrambleT >= 1 ? 1 : 0}>
+                  sealed · AES-256-GCM
+                </text>
+              </g>
+              <text x={520} y={355} textAnchor="middle" fill="#38E1FF" fontSize={10} fontFamily={MONO} opacity={beat === 2 ? 1 : 0}>
+                AES-256-GCM
+              </text>
+
+              {/* ===== pipe 2 (Browser → Storage) ===== */}
+              <line x1={645} y1={218} x2={775} y2={218} stroke="rgba(148,178,255,.14)" strokeWidth={2} />
+              <line x1={645} y1={218} x2={775} y2={218} stroke="url(#zk-pipe)" strokeWidth={2} strokeDasharray="4 16" strokeDashoffset={-p * 260} opacity={0.6} />
+              <circle cx={packet3X} cy={218} r={5.5} fill="#35F0A1" opacity={packet3Opacity} />
+
+              {/* ===== STORAGE cylinder ===== */}
+              <g opacity={0.55 + 0.45 * clamp01(b4 * 2)}>
+                <path d="M800 160 L800 300 A70 18 0 0 0 940 300 L940 160" fill="#101828" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
+                <ellipse cx={870} cy={160} rx={70} ry={18} fill="#101828" stroke="rgba(148,178,255,.18)" strokeWidth={1.5} />
+              </g>
+              {STORAGE_ROWS.map((row, i) => (
+                <text
+                  key={row}
+                  x={812}
+                  y={205 + i * 26}
+                  fill="#38E1FF"
+                  fontSize={10}
+                  fontFamily={MONO}
+                  opacity={b4 > i * 0.22 ? 0.55 : 0}
+                >
+                  {row}
+                </text>
+              ))}
+              <LockGlyph x={870} y={128} scale={lockScale} />
+              <text x={870} y={352} textAnchor="middle" fill="#5C6B84" fontSize={10} fontFamily={MONO} opacity={b4 > 0.5 ? 1 : 0}>
+                only ciphertext, ever
+              </text>
+            </svg>
+
+            {/* beat progress dots */}
+            <div className="absolute -left-2 top-1/2 hidden -translate-y-1/2 flex-col gap-2.5 md:flex" aria-hidden>
+              {BEATS.map((b, i) => (
+                <span
+                  key={b.title}
+                  className={cn(
+                    'h-2 w-2 rounded-full transition-colors duration-300',
+                    p * 4 > i ? 'bg-kh-mint' : 'bg-kh-elevated',
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* caption cards (cross-fade) */}
+          <div className="relative mt-6 h-[86px] w-full max-w-[560px]">
+            {BEATS.map((b, i) => (
+              <div
+                key={b.title}
+                className="absolute inset-0 rounded-2xl border border-kh-line bg-kh-surface/80 px-6 py-4 backdrop-blur-[8px] transition-all duration-300"
+                style={{
+                  opacity: beat === i ? 1 : 0,
+                  transform: `translateY(${beat === i ? 0 : 24}px)`,
+                  pointerEvents: beat === i ? 'auto' : 'none',
+                }}
+              >
+                <p className="text-sm leading-6 text-kh-muted">
+                  <span className="mr-2 font-mono text-xs text-kh-mint">0{i + 1}</span>
+                  {b.caption}
+                </p>
+              </div>
             ))}
           </div>
         </div>
-
-        {/* caption cards (cross-fade) */}
-        <div className="relative mt-6 h-[86px] w-full max-w-[560px]">
-          {BEATS.map((b, i) => (
-            <div
-              key={b.title}
-              className="absolute inset-0 rounded-2xl border border-kh-line bg-kh-surface/80 px-6 py-4 backdrop-blur-[8px] transition-all duration-300"
-              style={{
-                opacity: beat === i ? 1 : 0,
-                transform: `translateY(${beat === i ? 0 : 24}px)`,
-                pointerEvents: beat === i ? 'auto' : 'none',
-              }}
-            >
-              <p className="text-sm leading-6 text-kh-muted">
-                <span className="mr-2 font-mono text-xs text-kh-mint">0{i + 1}</span>
-                {b.caption}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

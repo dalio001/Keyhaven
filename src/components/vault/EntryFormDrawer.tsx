@@ -155,12 +155,14 @@ function MiniGenerator({ onUse }: { onUse: (password: string) => void }) {
 function FormBody({
   mode,
   entry,
+  initialPassword,
   onSave,
   onDelete,
   onValidityChange,
 }: {
   mode: 'add' | 'edit';
   entry: EntryExt | null;
+  initialPassword?: string;
   onSave: (draft: EntryFormDraft) => void;
   onDelete?: (entry: EntryExt) => void;
   onValidityChange: (valid: boolean) => void;
@@ -168,7 +170,7 @@ function FormBody({
   const [title, setTitle] = useState(entry?.title ?? '');
   const [url, setUrl] = useState(entry?.url ?? '');
   const [username, setUsername] = useState(entry?.username ?? '');
-  const [password, setPassword] = useState(entry?.password ?? '');
+  const [password, setPassword] = useState(entry?.password ?? initialPassword ?? '');
   const [category, setCategory] = useState<VaultCategory>(entry?.category ?? 'other');
   const [favorite, setFavorite] = useState(entry?.favorite ?? false);
   const [notes, setNotes] = useState(entry?.notes ?? '');
@@ -193,6 +195,19 @@ function FormBody({
     if (!q) return [];
     return POPULAR.filter((p) => p.domain.includes(q) || p.title.toLowerCase().includes(q)).slice(0, 6);
   }, [url]);
+
+  // opening the 2FA panel puts the cursor in the secret and scrolls the panel into view, so the
+  // click can't look like it did nothing when the panel opens below the visible area (KH-05)
+  const totpInputRef = useRef<HTMLInputElement>(null);
+  const totpPanelRef = useRef<HTMLDivElement>(null);
+  const revealTotp = useRef(false);
+  useEffect(() => {
+    if (!showTotp || !revealTotp.current) return;
+    revealTotp.current = false;
+    totpInputRef.current?.focus({ preventScroll: true });
+    const t = window.setTimeout(() => totpPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }), 350);
+    return () => window.clearTimeout(t);
+  }, [showTotp]);
 
   const notesRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -440,7 +455,10 @@ function FormBody({
       <motion.div {...fieldMotion(false, 5)} className="flex flex-col gap-1.5">
         <button
           type="button"
-          onClick={() => setShowTotp((v) => !v)}
+          onClick={() => {
+            revealTotp.current = !showTotp;
+            setShowTotp(!showTotp);
+          }}
           aria-expanded={showTotp}
           className="flex items-center gap-2 text-sm font-medium text-kh-cyan transition-colors hover:text-kh-mint"
         >
@@ -450,6 +468,7 @@ function FormBody({
         <AnimatePresence>
           {showTotp && (
             <motion.div
+              ref={totpPanelRef}
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
@@ -457,6 +476,7 @@ function FormBody({
             >
               <div className="flex flex-col gap-1.5 pt-1">
                 <input
+                  ref={totpInputRef}
                   value={totpInput}
                   onChange={(e) => setTotpInput(e.target.value)}
                   placeholder={mode === 'edit' && entry?.totp ? 'Paste a new secret to replace' : 'TOTP secret or otpauth:// URI'}
@@ -574,6 +594,7 @@ export default function EntryFormDrawer({
   open,
   mode,
   entry,
+  initialPassword,
   onClose,
   onSave,
   onDelete,
@@ -581,6 +602,8 @@ export default function EntryFormDrawer({
   open: boolean;
   mode: 'add' | 'edit';
   entry: EntryExt | null;
+  /** add mode: start with this password (e.g. one just generated) */
+  initialPassword?: string;
   onClose: () => void;
   onSave: (draft: EntryFormDraft) => void;
   onDelete?: (entry: EntryExt) => void;
@@ -642,6 +665,7 @@ export default function EntryFormDrawer({
           key={`${mode}-${entry?.id ?? 'new'}`}
           mode={mode}
           entry={entry}
+          initialPassword={mode === 'add' ? initialPassword : undefined}
           onSave={handleSave}
           onDelete={onDelete}
           onValidityChange={setFormValid}

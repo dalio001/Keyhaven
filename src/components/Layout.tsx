@@ -8,17 +8,22 @@
  * never by removing this offset.
  */
 
-import { Outlet } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
+import ErrorBoundary from './ErrorBoundary';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import VaultNotices from './VaultNotices';
 
 export default function Layout() {
+  const { pathname } = useLocation();
   return (
     <div className="flex min-h-[100dvh] flex-col bg-kh-base text-kh-primary">
       <Navbar />
       <main className="flex-1 pt-[72px]">
-        <Outlet />
+        {/* a crashed page shows a recoverable message; navigating to another page resets it */}
+        <ErrorBoundary key={pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <Footer />
       <VaultNotices />

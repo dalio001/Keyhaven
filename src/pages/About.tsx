@@ -6,6 +6,7 @@
  */
 
 import { useEffect } from 'react';
+import { useLocation } from 'react-router';
 import Lenis from 'lenis';
 import CursorRing from '@/components/CursorRing';
 import AboutHero from '@/components/about/AboutHero';
@@ -17,6 +18,8 @@ import AboutFaq from '@/components/about/AboutFaq';
 import AboutCta from '@/components/about/AboutCta';
 
 export default function About() {
+  const location = useLocation();
+
   // Lenis smooth scroll (marketing pages only), lerp 0.09 per design.md §5
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -32,6 +35,16 @@ export default function About() {
       lenis.destroy();
     };
   }, []);
+
+  // honor /about#section links (the footer's Privacy link goes to #privacy)
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = location.hash.slice(1);
+    const t = setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [location.hash]);
 
   return (
     <>

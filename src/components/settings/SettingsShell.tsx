@@ -62,7 +62,7 @@ function Sidebar() {
       {/* primary action */}
       <div className="px-4 max-[1100px]:px-3">
         <button
-          onClick={() => navigate('/vault')}
+          onClick={() => navigate('/vault?new=1')}
           className="bg-aurora flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-[#04110B] transition-all duration-200 hover:-translate-y-px hover:shadow-glow active:scale-[0.97]"
           aria-label="New login"
         >
@@ -134,7 +134,7 @@ function Topbar({ title }: { title: string }) {
       </div>
 
       <button
-        onClick={() => navigate('/vault')}
+        onClick={() => navigate('/vault?search=1')}
         className="hidden w-full max-w-[340px] items-center gap-2.5 rounded-full border border-kh-line bg-kh-inset px-4 py-2 text-sm text-kh-faint transition-colors hover:border-kh-lineStrong hover:text-kh-muted md:flex"
       >
         <Search className="h-4 w-4" />

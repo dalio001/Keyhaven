@@ -27,6 +27,7 @@ import {
   makeId,
 } from '@/components/generator/genUtils';
 import type { GenMode, HistoryItem, RecipeState } from '@/components/generator/genUtils';
+import { offerSecret } from '@/lib/handoff';
 
 const MODES: { key: GenMode; label: string }[] = [
   { key: 'password', label: 'Password' },
@@ -152,12 +153,9 @@ export default function Generator() {
 
   const saveToVault = useCallback(
     (value: string) => {
-      try {
-        sessionStorage.setItem('kh:generator-seed', value);
-      } catch {
-        /* private mode — the seed query param still carries the handoff */
-      }
-      navigate(`/vault?new=1&seed=${encodeURIComponent(value)}`);
+      // hand the secret over in memory only — never in the URL, history or storage (KH-01)
+      offerSecret(value);
+      navigate('/vault?new=1');
     },
     [navigate],
   );

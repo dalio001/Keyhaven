@@ -88,22 +88,26 @@ export default function EncryptionStory() {
   /* ---------- reduced motion: stacked panels ---------- */
   if (reduced) {
     return (
-      <section id="security" ref={sectionRef} className="py-24">
-        <div className="mx-auto max-w-[720px] space-y-8 px-6">
-          {[
-            { chip: 0, title: 'You type.', body: 'A password on its own is just text — anyone who reads it, owns it.', content: PLAINTEXT, cls: 'text-kh-primary' },
-            { chip: 1, title: 'Your browser encrypts.', body: 'PBKDF2 stretches your master password into a key (600,000 iterations); AES-256-GCM seals every login. It never leaves your device readable.', content: CIPHER, cls: 'text-kh-warning' },
-            { chip: 2, title: 'Only your key opens it.', body: 'Stored as unreadable noise. Opened only with your master password (plus your authenticator check, if enabled).', content: CIPHER, cls: 'text-kh-mint' },
-          ].map((p) => (
-            <div key={p.title} className="rounded-2xl border border-kh-line bg-kh-inset p-8">
-              <StatusChip stage={p.chip} />
-              <h3 className="mt-4 font-display text-2xl font-semibold text-kh-primary">{p.title}</h3>
-              <p className={`mt-3 break-all font-mono text-lg ${p.cls}`}>{p.content}</p>
-              <p className="mt-3 text-sm leading-6 text-kh-muted">{p.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      // GSAP pins the <section> by moving it into a spacer div; this React-owned
+      // wrapper keeps React able to remove the page when navigating away (KH-06).
+      <div>
+        <section id="security" ref={sectionRef} className="py-24">
+          <div className="mx-auto max-w-[720px] space-y-8 px-6">
+            {[
+              { chip: 0, title: 'You type.', body: 'A password on its own is just text — anyone who reads it, owns it.', content: PLAINTEXT, cls: 'text-kh-primary' },
+              { chip: 1, title: 'Your browser encrypts.', body: 'PBKDF2 stretches your master password into a key (600,000 iterations); AES-256-GCM seals every login. It never leaves your device readable.', content: CIPHER, cls: 'text-kh-warning' },
+              { chip: 2, title: 'Only your key opens it.', body: 'Stored as unreadable noise. Opened only with your master password (plus your authenticator check, if enabled).', content: CIPHER, cls: 'text-kh-mint' },
+            ].map((p) => (
+              <div key={p.title} className="rounded-2xl border border-kh-line bg-kh-inset p-8">
+                <StatusChip stage={p.chip} />
+                <h3 className="mt-4 font-display text-2xl font-semibold text-kh-primary">{p.title}</h3>
+                <p className={`mt-3 break-all font-mono text-lg ${p.cls}`}>{p.content}</p>
+                <p className="mt-3 text-sm leading-6 text-kh-muted">{p.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     );
   }
 
@@ -114,80 +118,84 @@ export default function EncryptionStory() {
   const collapse = stage === 2 ? lp : 0;
 
   return (
-    <section id="security" ref={sectionRef} className="relative">
-      <div className="flex h-[100dvh] flex-col items-center justify-center overflow-hidden px-6">
-        {/* backdrop ring */}
-        <VaultRing
-          size={620}
-          muted
-          progress={stage === 2 ? lp : 0}
-          className="pointer-events-none absolute opacity-40"
-        />
+    // GSAP pins the <section> by moving it into a spacer div; this React-owned
+    // wrapper keeps React able to remove the page when navigating away (KH-06).
+    <div>
+      <section id="security" ref={sectionRef} className="relative">
+        <div className="flex h-[100dvh] flex-col items-center justify-center overflow-hidden px-6">
+          {/* backdrop ring */}
+          <VaultRing
+            size={620}
+            muted
+            progress={stage === 2 ? lp : 0}
+            className="pointer-events-none absolute opacity-40"
+          />
 
-        <StatusRow stage={stage} />
+          <StatusRow stage={stage} />
 
-        {/* terminal card */}
-        <div
-          className="relative w-full max-w-[720px] rounded-2xl border border-kh-line bg-kh-inset p-8 shadow-card"
-          style={{
-            transform: `scale(${1 - collapse * 0.12})`,
-            opacity: 1 - collapse * 0.35,
-          }}
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-kh-danger/60" />
-            <span className="h-2.5 w-2.5 rounded-full bg-kh-warning/60" />
-            <span className="h-2.5 w-2.5 rounded-full bg-kh-mint/60" />
-            <span className="ml-3 font-mono text-xs text-kh-faint">vault-entry — local only</span>
-          </div>
-
-          <div className="mt-6 min-h-[96px] font-mono text-[clamp(20px,3vw,30px)] leading-[1.4]">
-            {stage === 0 && (
-              <span className="text-kh-primary">
-                {PLAINTEXT.slice(0, typedCount)}
-                <span className="ml-0.5 inline-block h-[1.1em] w-[2px] animate-caret-blink bg-kh-mint align-middle" />
-              </span>
-            )}
-            {stage >= 1 && (
-              <span className={stage === 1 ? 'text-kh-warning' : 'text-kh-mint'}>
-                {CIPHER.split('').map((c, i) =>
-                  i < settleCount ? (
-                    <span key={i}>{c}</span>
-                  ) : (
-                    <span key={i} className="opacity-70">
-                      {GLYPHS[(i * 7 + Math.floor(lp * 40)) % GLYPHS.length]}
-                    </span>
-                  ),
-                )}
-              </span>
-            )}
-          </div>
-
-          {stage === 1 && (
-            <p className="mt-4 font-mono text-xs text-kh-cyan">
-              PBKDF2-SHA256 · {iterations.toLocaleString()} iterations · salt 0x8F2E…
-            </p>
-          )}
-
-          {stage === 2 && (
-            <div className="mt-4 flex items-center gap-3" style={{ opacity: Math.min(1, lp * 1.6) }}>
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-kh-mint/40 bg-kh-mint/10">
-                <KeyRound className="h-5 w-5 text-kh-mint" />
-              </span>
-              <span className="font-mono text-sm text-kh-mint">key verified · vault sealed</span>
+          {/* terminal card */}
+          <div
+            className="relative w-full max-w-[720px] rounded-2xl border border-kh-line bg-kh-inset p-8 shadow-card"
+            style={{
+              transform: `scale(${1 - collapse * 0.12})`,
+              opacity: 1 - collapse * 0.35,
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-kh-danger/60" />
+              <span className="h-2.5 w-2.5 rounded-full bg-kh-warning/60" />
+              <span className="h-2.5 w-2.5 rounded-full bg-kh-mint/60" />
+              <span className="ml-3 font-mono text-xs text-kh-faint">vault-entry — local only</span>
             </div>
-          )}
-        </div>
 
-        {/* captions */}
-        <p className="mt-8 max-w-[52ch] text-center text-sm leading-6 text-kh-muted">
-          {stage === 0 && 'You type. A password on its own is just text — anyone who reads it, owns it.'}
-          {stage === 1 &&
-            'Your browser encrypts. PBKDF2 stretches your master password into a key; AES-256-GCM seals every login. It never leaves your device readable.'}
-          {stage === 2 &&
-            'Only your key opens it. Stored as unreadable noise. Opened only with your master password (plus your authenticator check, if enabled).'}
-        </p>
-      </div>
-    </section>
+            <div className="mt-6 min-h-[96px] font-mono text-[clamp(20px,3vw,30px)] leading-[1.4]">
+              {stage === 0 && (
+                <span className="text-kh-primary">
+                  {PLAINTEXT.slice(0, typedCount)}
+                  <span className="ml-0.5 inline-block h-[1.1em] w-[2px] animate-caret-blink bg-kh-mint align-middle" />
+                </span>
+              )}
+              {stage >= 1 && (
+                <span className={stage === 1 ? 'text-kh-warning' : 'text-kh-mint'}>
+                  {CIPHER.split('').map((c, i) =>
+                    i < settleCount ? (
+                      <span key={i}>{c}</span>
+                    ) : (
+                      <span key={i} className="opacity-70">
+                        {GLYPHS[(i * 7 + Math.floor(lp * 40)) % GLYPHS.length]}
+                      </span>
+                    ),
+                  )}
+                </span>
+              )}
+            </div>
+
+            {stage === 1 && (
+              <p className="mt-4 font-mono text-xs text-kh-cyan">
+                PBKDF2-SHA256 · {iterations.toLocaleString()} iterations · salt 0x8F2E…
+              </p>
+            )}
+
+            {stage === 2 && (
+              <div className="mt-4 flex items-center gap-3" style={{ opacity: Math.min(1, lp * 1.6) }}>
+                <span className="flex h-10 w-10 items-center justify-center rounded-full border border-kh-mint/40 bg-kh-mint/10">
+                  <KeyRound className="h-5 w-5 text-kh-mint" />
+                </span>
+                <span className="font-mono text-sm text-kh-mint">key verified · vault sealed</span>
+              </div>
+            )}
+          </div>
+
+          {/* captions */}
+          <p className="mt-8 max-w-[52ch] text-center text-sm leading-6 text-kh-muted">
+            {stage === 0 && 'You type. A password on its own is just text — anyone who reads it, owns it.'}
+            {stage === 1 &&
+              'Your browser encrypts. PBKDF2 stretches your master password into a key; AES-256-GCM seals every login. It never leaves your device readable.'}
+            {stage === 2 &&
+              'Only your key opens it. Stored as unreadable noise. Opened only with your master password (plus your authenticator check, if enabled).'}
+          </p>
+        </div>
+      </section>
+    </div>
   );
 }

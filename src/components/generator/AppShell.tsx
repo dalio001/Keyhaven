@@ -191,7 +191,7 @@ function TopBar({ title }: { title: string }) {
       {/* ⌘K search pill */}
       <button
         type="button"
-        onClick={() => navigate('/vault')}
+        onClick={() => navigate('/vault?search=1')}
         className="mx-auto hidden w-full max-w-[320px] items-center gap-2 rounded-full border border-kh-line bg-kh-inset px-4 py-2 text-sm text-kh-faint transition-colors hover:border-kh-lineStrong md:flex"
       >
         <Search className="h-3.5 w-3.5" />

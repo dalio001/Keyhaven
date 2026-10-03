@@ -9,10 +9,11 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVault } from '@/providers/VaultProvider';
 
 const NAV_LINKS = [
   { label: 'Features', to: '/#features', hash: 'features' },
@@ -21,12 +22,19 @@ const NAV_LINKS = [
   { label: 'About', to: '/about', hash: null },
 ] as const;
 
+const CTA_SECONDARY = 'rounded-full px-4 py-2 text-sm font-medium text-kh-muted transition-colors hover:text-kh-primary';
+const CTA_PRIMARY =
+  'bg-aurora group flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-[#04110B] transition-all duration-200 hover:-translate-y-px hover:shadow-glow active:scale-[0.97]';
+const CTA_ARROW = 'h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5';
+const MOBILE_PRIMARY = 'bg-aurora rounded-full px-6 py-3 text-center text-base font-semibold text-[#04110B]';
+
 export default function Navbar() {
+  // the actions follow the vault (KH-11): open / lock it when unlocked, unlock it when one exists
+  const { status, lock } = useVault();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [spy, setSpy] = useState<string | null>(null);
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const onScroll = () => {
@@ -103,19 +111,32 @@ export default function Navbar() {
 
           {/* right CTAs */}
           <div className="hidden items-center gap-3 md:flex">
-            <button
-              onClick={() => navigate('/unlock')}
-              className="rounded-full px-4 py-2 text-sm font-medium text-kh-muted transition-colors hover:text-kh-primary"
-            >
-              Unlock vault
-            </button>
-            <button
-              onClick={() => navigate('/unlock?mode=create')}
-              className="bg-aurora group flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-[#04110B] transition-all duration-200 hover:-translate-y-px hover:shadow-glow active:scale-[0.97]"
-            >
-              Create your vault
-              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-            </button>
+            {status === 'unlocked' ? (
+              <>
+                <button type="button" onClick={() => void lock()} className={CTA_SECONDARY}>
+                  Lock
+                </button>
+                <Link to="/vault" className={CTA_PRIMARY}>
+                  Open vault
+                  <ArrowRight className={CTA_ARROW} />
+                </Link>
+              </>
+            ) : status === 'locked' ? (
+              <Link to="/unlock" className={CTA_PRIMARY}>
+                Unlock vault
+                <ArrowRight className={CTA_ARROW} />
+              </Link>
+            ) : (
+              <>
+                <Link to="/unlock" className={CTA_SECONDARY}>
+                  Unlock vault
+                </Link>
+                <Link to="/unlock?mode=create" className={CTA_PRIMARY}>
+                  Create your vault
+                  <ArrowRight className={CTA_ARROW} />
+                </Link>
+              </>
+            )}
           </div>
 
           {/* mobile hamburger */}
@@ -180,15 +201,29 @@ export default function Navbar() {
                 transition={{ delay: 0.06 * NAV_LINKS.length + 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="mt-8 flex flex-col gap-3"
               >
-                <Link to="/unlock" className="text-lg font-medium text-kh-muted">
-                  Unlock vault
-                </Link>
-                <Link
-                  to="/unlock?mode=create"
-                  className="bg-aurora rounded-full px-6 py-3 text-center text-base font-semibold text-[#04110B]"
-                >
-                  Create your vault
-                </Link>
+                {status === 'unlocked' ? (
+                  <>
+                    <button type="button" onClick={() => void lock()} className="text-left text-lg font-medium text-kh-muted">
+                      Lock
+                    </button>
+                    <Link to="/vault" className={MOBILE_PRIMARY}>
+                      Open vault
+                    </Link>
+                  </>
+                ) : status === 'locked' ? (
+                  <Link to="/unlock" className={MOBILE_PRIMARY}>
+                    Unlock vault
+                  </Link>
+                ) : (
+                  <>
+                    <Link to="/unlock" className="text-lg font-medium text-kh-muted">
+                      Unlock vault
+                    </Link>
+                    <Link to="/unlock?mode=create" className={MOBILE_PRIMARY}>
+                      Create your vault
+                    </Link>
+                  </>
+                )}
               </motion.div>
             </nav>
           </motion.div>

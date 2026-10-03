@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useSearchParams } from 'react-router';
 import { MotionConfig, motion, useReducedMotion } from 'framer-motion';
 import { Plus, SearchX } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
@@ -19,6 +19,9 @@ import CommandPalette from '@/components/vault/CommandPalette';
 import DetailDrawer from '@/components/vault/DetailDrawer';
 import EntryFormDrawer from '@/components/vault/EntryFormDrawer';
 import type { EntryFormDraft } from '@/components/vault/EntryFormDrawer';
+import { VAULT_LINK_PARAMS, hasVaultLinkParams, parseVaultLink } from '@/components/vault/deep-link';
+import { clearSecret, peekSecret } from '@/lib/handoff';
+import { loadIgnored } from '@/components/security/analysis';
 import EntryList from '@/components/vault/EntryList';
 import FilterBar from '@/components/vault/FilterBar';
 import StatsStrip from '@/components/vault/StatsStrip';
@@ -46,6 +49,7 @@ const WELCOME_KEY = 'kh-vault-welcomed';
 
 export default function Vault() {
   const { status } = useVault();
+  const { pathname, search } = useLocation();
 
   // next unlock session should greet again
   useEffect(() => {
@@ -63,7 +67,8 @@ export default function Vault() {
     );
   }
   if (status !== 'unlocked') {
-    return <Navigate to="/unlock" replace />;
+    // remember the link (/vault?new=1 …) so unlocking lands where it pointed
+    return <Navigate to="/unlock" replace state={{ next: pathname + search }} />;
   }
   return <VaultDashboard />;
 }
@@ -76,6 +81,8 @@ interface FormState {
   open: boolean;
   mode: 'add' | 'edit';
   entry: EntryExt | null;
+  /** a generated password handed over in memory (Generator → Save to vault) */
+  initialPassword?: string;
 }
 
 function VaultDashboard() {
@@ -97,23 +104,31 @@ function VaultDashboard() {
     [flush],
   );
 
-  const [category, setCategory] = useState<CategoryFilter>('all');
+  // links from other pages (/vault?new=1, ?edit=, ?entry=, ?search=1, ?filter=, ?cat=), read once on arrival
+  const [params, setParams] = useSearchParams();
+  const [link] = useState(() => parseVaultLink(params));
+  const [category, setCategory] = useState<CategoryFilter>(link.category ?? 'all');
   const [statFilter, setStatFilter] = useState<StatFilter>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
   const [view, setView] = useState<'list' | 'grid'>('list');
-  const [params, setParams] = useSearchParams();
-  // /vault?entry=<id> (from a subscription or account) opens that login
-  const [detailId, setDetailId] = useState<string | null>(() => params.get('entry'));
-  const [form, setForm] = useState<FormState>({ open: false, mode: 'add', entry: null });
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(link.entryId);
+  const [form, setForm] = useState<FormState>(() => {
+    const toEdit = link.editId ? entries.find((e) => e.id === link.editId) : undefined;
+    if (toEdit) return { open: true, mode: 'edit', entry: toEdit as EntryExt };
+    if (link.newLogin) return { open: true, mode: 'add', entry: null, initialPassword: peekSecret() ?? undefined };
+    return { open: false, mode: 'add', entry: null };
+  });
+  const [paletteOpen, setPaletteOpen] = useState(link.search);
   const [newId, setNewId] = useState<string | null>(null);
   const greeted = useRef(false);
 
   /* ---------- derived data ---------- */
   const strength = useMemo(() => buildStrengthMap(entries), [entries]);
   const reused = useMemo(() => reusedPasswords(entries), [entries]);
-  const stats = useMemo(() => computeStats(entries, strength), [entries, strength]);
+  // checks the user chose to ignore in Watchtower count the same here (KH-07)
+  const [ignored] = useState(() => loadIgnored());
+  const stats = useMemo(() => computeStats(entries, strength, ignored), [entries, strength, ignored]);
 
   const counts = useMemo(() => {
     const perCategory = Object.fromEntries(
@@ -156,20 +171,21 @@ function VaultDashboard() {
         durationMs: 4500,
       });
     }
-    if (entries.length === 0) {
+    if (entries.length === 0 && !link.newLogin && !link.editId) {
       const t = setTimeout(() => setForm({ open: true, mode: 'add', entry: null }), 800);
       return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- deep link: /vault?entry=<id> opened that login (above); tidy the URL ---------- */
+  /* ---------- links were read on arrival (above): forget the handed-over secret, tidy the URL ---------- */
+  useEffect(() => clearSecret(), []);
   useEffect(() => {
-    if (!params.has('entry')) return;
+    if (!hasVaultLinkParams(params)) return;
     setParams(
       (p) => {
         const next = new URLSearchParams(p);
-        next.delete('entry');
+        VAULT_LINK_PARAMS.forEach((k) => next.delete(k));
         return next;
       },
       { replace: true },
@@ -364,6 +380,7 @@ function VaultDashboard() {
         open={form.open}
         mode={form.mode}
         entry={form.entry}
+        initialPassword={form.initialPassword}
         onClose={() => setForm((f) => ({ ...f, open: false }))}
         onSave={handleSave}
         onDelete={form.mode === 'edit' ? (e) => handleDelete(e) : undefined}

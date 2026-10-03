@@ -20,7 +20,7 @@ import { draftFromSubscription, newDraft } from '@/components/subscriptions/form
 import { accountTitle } from '@/components/subscriptions/labels';
 import VaultToasts from '@/components/vault/VaultToasts';
 import { showVaultToast } from '@/components/vault/vault-utils';
-import { todayLocal } from '@/lib/billing/dates';
+import { useToday } from '@/hooks/useToday';
 import { cn } from '@/lib/utils';
 import type { Account, Subscription } from '@/lib/vault';
 import { useVault } from '@/providers/VaultProvider';
@@ -65,7 +65,7 @@ function SubscriptionsView() {
   } = useVault();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const today = todayLocal(new Date());
+  const today = useToday();
   const tab = params.get('tab') === 'accounts' ? 'accounts' : 'subscriptions';
   const [accountForm, setAccountForm] = useState<AccountForm>({ open: false, account: null });
 

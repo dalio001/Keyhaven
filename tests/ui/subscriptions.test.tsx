@@ -273,6 +273,7 @@ describe('date fields stay strings end to end', () => {
       ...readdirSync(join(root, 'components', 'subscriptions')).map((f) => join(root, 'components', 'subscriptions', f)),
       join(root, 'pages', 'Subscriptions.tsx'),
       join(root, 'lib', 'records.ts'),
+      join(root, 'hooks', 'useToday.ts'),
     ];
     for (const file of files) {
       const code = readFileSync(file, 'utf8')

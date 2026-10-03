@@ -5,7 +5,7 @@
 
 import { Link } from 'react-router';
 import { CalendarClock, Plus } from 'lucide-react';
-import { todayLocal } from '@/lib/billing/dates';
+import { useToday } from '@/hooks/useToday';
 import { subscriptionState } from '@/lib/billing/status';
 import type { VaultEntry } from '@/lib/vault';
 import { useVault } from '@/providers/VaultProvider';
@@ -15,7 +15,7 @@ export default function LinkedSubscriptions({ entry }: { entry: VaultEntry }) {
   const { accounts, subscriptions } = useVault();
   const account = entry.accountId ? accounts.find((a) => a.id === entry.accountId) : undefined;
   const subs = account ? subscriptions.filter((s) => s.accountId === account.id) : [];
-  const today = todayLocal(new Date());
+  const today = useToday();
 
   return (
     <section aria-label="Account and subscriptions">

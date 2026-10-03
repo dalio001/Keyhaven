@@ -17,6 +17,8 @@ import { generatePassword } from '@/lib/crypto';
 import { cn } from '@/lib/utils';
 import StrengthMeter from './StrengthMeter';
 import VaultDrawer from './VaultDrawer';
+import { FieldError, Label } from './form-fields';
+import { inputCls } from './form-styles';
 import { CATEGORY_META, CATEGORY_ORDER, parseTotpInput } from './vault-utils';
 import type { EntryExt } from './vault-utils';
 
@@ -57,38 +59,6 @@ const POPULAR: { domain: string; title: string; category: VaultCategory }[] = [
   { domain: 'paypal.com', title: 'PayPal', category: 'finance' },
   { domain: 'coinbase.com', title: 'Coinbase', category: 'finance' },
 ];
-
-/* ------------------------------------------------------------------ */
-/* field primitives                                                    */
-/* ------------------------------------------------------------------ */
-
-function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
-  return (
-    <label htmlFor={htmlFor} className="text-eyebrow block text-kh-faint">
-      {children}
-    </label>
-  );
-}
-
-const inputCls =
-  'h-11 w-full rounded-xl border border-kh-line bg-kh-inset px-3.5 text-sm text-kh-primary placeholder:text-kh-faint transition-colors focus:border-kh-cyan/60 focus:outline-none';
-
-function FieldError({ show, children }: { show: boolean; children: string }) {
-  return (
-    <AnimatePresence>
-      {show && (
-        <motion.p
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="overflow-hidden text-xs text-kh-danger"
-        >
-          {children}
-        </motion.p>
-      )}
-    </AnimatePresence>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* inline mini generator popover                                       */

@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Copy, Globe, Pencil, Star, Trash2 } from 'lucide-react';
 import LetterAvatar from '@/components/LetterAvatar';
+import LinkedSubscriptions from '@/components/subscriptions/LinkedSubscriptions';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useVault } from '@/providers/VaultProvider';
 import { cn } from '@/lib/utils';
@@ -114,6 +115,7 @@ function DetailBody({
         </div>
       </section>
     ) },
+    { key: 'subscriptions', node: <LinkedSubscriptions entry={entry} /> },
     ...(entry.notes ? [{ key: 'notes', node: (
       <section aria-label="Notes">
         <FieldLabel>Notes</FieldLabel>

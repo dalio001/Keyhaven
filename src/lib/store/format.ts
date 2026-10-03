@@ -263,9 +263,15 @@ export function serializeBackupFile(record: VaultRecordV2, exportedAt: string): 
 /* ------------------------------------------------------------------ */
 
 /**
- * The decrypted vault payload. Unknown keys (top-level and per entry, e.g.
- * `totpSecret`, `passwordHistory`, future account/subscription data) are
- * preserved on every round-trip.
+ * The decrypted vault payload. Unknown keys (top-level and per item, e.g.
+ * `totpSecret`, `passwordHistory`) are preserved on every round-trip.
+ *
+ * `accounts` and `subscriptions` are optional and absent until the user
+ * creates one, so vaults that never use them stay byte-identical. They are
+ * read through `src/lib/records.ts`, which tolerates malformed items (skipped
+ * for display, carried through verbatim on save) instead of rejecting the
+ * vault. Adding them needs no record-version bump: older builds preserve
+ * unknown keys, and links live on the child records (`accountId`).
  */
 export interface VaultPayload {
   entries: VaultEntry[];
@@ -275,6 +281,8 @@ export interface VaultPayload {
    * for compatibility; the codes NEVER recover a forgotten master password.
    */
   recoveryCodes: string[];
+  accounts?: unknown;
+  subscriptions?: unknown;
   [unknownField: string]: unknown;
 }
 

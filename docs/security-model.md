@@ -38,12 +38,30 @@ Everything lives in the browser profile that runs KeyHaven. Nothing is sent to a
 | `commitId` | Random id of the write that produced the record (compare-and-swap token) | yes |
 | `salt`, `kdf` | PBKDF2 salt and parameters | yes |
 | `verifier` | SHA-256 of the derived key bits (rejects a wrong password before decrypting) | yes |
-| `blob` | AES-256-GCM ciphertext of the vault payload (entries, settings, authenticator backup codes, and any future data) | **encrypted** |
+| `blob` | AES-256-GCM ciphertext of the vault payload (logins, accounts, subscriptions, settings, authenticator backup codes, and any future data) | **encrypted** |
 | `totpEnabled`, `totpSecretEncrypted` | Whether the authenticator check is on; its secret, encrypted with the vault key | flag yes, secret **encrypted** |
 | `createdAt`, `updatedAt`, `migratedFrom` | Timestamps; details of a legacy-format upgrade | yes |
 
 Someone who copies the record learns these metadata values (for example how many times the vault was
 saved and whether the authenticator is enabled), but not the entries, passwords, notes, codes or secrets.
+
+### Accounts and subscriptions
+
+Accounts (one sign-up at one service) and subscriptions (plan, price, billing cycle and dates, status,
+who bills you) live **inside the encrypted payload**, next to the logins. They are therefore encrypted
+with the vault key and included in every encrypted backup. Nothing about them is visible in the stored
+record, and nothing is looked up online: prices and dates are exactly what you entered.
+
+- **Links point from the child to the account.** A login or subscription stores `accountId`; an account
+  never lists its children. Deleting a login (even with an older KeyHaven) leaves its account and
+  subscriptions in place. Deleting or canceling a subscription never touches a login. An account that still
+  has subscriptions can't be removed, and removing one only unlinks its logins.
+- **Dates are calendar days** (`YYYY-MM-DD`), stored exactly as entered and never converted with the
+  Date constructor, so no time zone or daylight-saving change can shift them. Later renewals are worked
+  out from the date you entered (Jan 31 monthly → Feb 28/29 → Mar 31) when shown, and nothing is
+  written back.
+- **Prices are whole minor units** (cents) plus an ISO 4217 currency code. Different currencies are never
+  added together.
 
 ---
 
@@ -214,10 +232,19 @@ All persistence goes through one controller (`src/lib/store/controller.ts`). It 
 | Backup file | `version: 1` wrapper or bare record | `version: 2` wrapper | v1 and v2 accepted; v1 is migrated on import |
 | IndexedDB | DB version 1 | DB version 2 | Same store and keys; the bump only fences old code |
 | Encrypted payload | `{ entries, settings, recoveryCodes }` | same, plus any unknown fields | Unknown fields (including per-entry `totpSecret`, `passwordHistory`) are preserved |
+| Accounts & subscriptions | — | optional `accounts`, `subscriptions` arrays in the payload; optional `accountId` on logins | Added only once you create one; no record-version bump (see below) |
 
 - `record.version` (readable without the password) is the single format gate. A record or backup with a
   **newer** version is refused with "update KeyHaven" and left untouched. It is never downgraded or rewritten.
 - Within a known version, unknown top-level and per-entry fields are preserved on every save.
+- Accounts and subscriptions did **not** need a new record version. The Phase-1 build already preserves
+  unknown payload keys and login fields, so editing or deleting logins there keeps them intact (tested in a
+  real browser on the same origin). A version bump would have locked older tabs out of the whole vault.
+  Malformed account or subscription data never stops the vault from opening and is never discarded:
+  - An item KeyHaven can't use is hidden from the lists and carried through every save verbatim. An item is
+    unusable if it has no text `id`, or is an account without a text service name or with non-text fields.
+  - A collection that isn't a list is kept as is, and editing it is turned off.
+  - A subscription whose account is hidden shows as "Unknown account" and can be moved to another account.
 
 ### How a legacy vault is migrated
 
@@ -302,6 +329,8 @@ leaked key did not need it.
 - **One unlocked tab at a time** by design. Cross-tab messages can be missed, for example by frozen
   background tabs. Compare-and-swap still prevents overwrites, but a stale tab may then report a conflict.
 - **New vaults are seeded with sample entries** (existing behaviour, unchanged here).
+- **Subscription details are what you enter.** KeyHaven doesn't fetch prices, verify renewals, charge or
+  cancel anything, and has no currency conversion. Totals, reminders and cancellation help are later work.
 
 ---
 
@@ -324,6 +353,10 @@ npm run lint
 | Import/restore/delete with pending writes, stale-write conflicts, legacy imports, export fallbacks, damaged records | `tests/controller-admin.test.ts` |
 | One unlocked tab, refresh, lost messages, reload in place | `tests/controller-tabs.test.ts` |
 | Unlock screen claims vs behaviour, provider save state, unload warning | `tests/ui/unlock.test.tsx` |
+| Account/subscription operations: links, removal rules, malformed data kept verbatim | `tests/records.test.ts` |
+| Billing dates (month ends, leap years, custom intervals, time zones), money, derived status | `tests/billing-*.test.ts` |
+| Subscriptions encrypted at rest, in backups, through lock/unlock, legacy upgrade and Phase-1-style edits | `tests/subscriptions-store.test.ts` |
+| Subscription form: validation, dates kept as strings, distinct accounts | `tests/subscription-form.test.ts`, `tests/ui/subscriptions.test.tsx`, `tests/ui/provider-records.test.tsx` |
 
 Golden fixtures in `tests/fixtures/` were generated with the pre-Phase-1 code, using synthetic passwords and
 data only. `tests/legacy/v1.ts` keeps a frozen copy of the legacy algorithms for these tests; application

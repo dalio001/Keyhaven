@@ -25,7 +25,7 @@ Everything lives in the browser profile that runs KeyHaven. Nothing is sent to a
 |---|---|---|
 | IndexedDB `keyhaven` (DB version 2), store `vault`, key `current` | The vault record (below) | Ciphertext + public metadata |
 | same store, key `previous` | The vault replaced by the last import/restore, if any (deletable from Settings) | Ciphertext + public metadata |
-| `localStorage` `keyhaven.lastMethod`, `keyhaven:last-export`, `keyhaven:prefs`, `keyhaven.watchtower.ignored`, `keyhaven:migration-ack:<vaultId>` | UI preferences, last export time, acknowledged notices, Watchtower "ignored" entry ids | No |
+| `localStorage` `keyhaven.lastMethod`, `keyhaven:last-export`, `keyhaven:prefs`, `keyhaven.watchtower.ignored`, `keyhaven:migration-ack:<vaultId>`, `keyhaven:backup-reminder-snoozed-until` | UI preferences, last export time, acknowledged notices, Watchtower "ignored" entry ids, until when the backup reminder is snoozed (a time only) | No |
 | `sessionStorage` `kh-vault-welcomed` | Welcome-toast flag | No |
 
 ### The vault record (format v2)
@@ -62,6 +62,18 @@ record, and nothing is looked up online: prices and dates are exactly what you e
   written back.
 - **Prices are whole minor units** (cents) plus an ISO 4217 currency code. Different currencies are never
   added together.
+- **Totals (the Overview and account pages)** are worked out when shown, from what you entered, and never
+  stored; viewing them never writes to the vault.
+  - Per currency only — no conversion. A subscription with an unusable field is counted as "needs
+    attention", never added up. Canceled subscriptions have no future charges. A trial's first charge is its
+    end date, so trials appear in the month and 12-month figures, and the average says how many trials it
+    includes.
+  - "Expected this month" and "next 12 months" are the charges actually scheduled (counted from the date
+    you entered). The monthly average is a separate estimate: month ÷ count, year ÷ 12·count, and week/day
+    plans at 365.2425 days a year.
+- **"Manage at …" links** open the account's saved website in a new tab (`noopener noreferrer`, http/https
+  only) when you click them; KeyHaven itself never contacts the site. Apple and Google Play subscriptions
+  get written instructions, not links.
 
 ---
 
@@ -320,8 +332,12 @@ leaked key did not need it.
 - **Browser storage can be evicted.**
   - Browsers may delete site data under storage pressure, or after a period without use. Safari
     applies a 7-day rule to script-writable storage.
-  - KeyHaven does not yet request persistent storage.
-  - Keep encrypted backups.
+  - After unlocking, KeyHaven asks the browser once per visit to keep its storage
+    (`navigator.storage.persist()`). Chromium decides silently, Firefox asks you, Safari applies its own
+    rules; Settings → Vault & data shows the answer. Kept storage is still not a backup.
+  - Keep encrypted backups. The vault page reminds you when you have data of your own and no export, or
+    the last one is over 30 days old and the vault changed since. The last-export time is per browser, not
+    per vault.
 - **Secure deletion is not possible.** Deleting a vault or old record removes it from IndexedDB. The
   browser's storage engine may keep fragments on disk until they are compacted.
 - **Unlock throttling** lives in memory only (see [Failed attempts](#failed-attempts)).
@@ -330,7 +346,8 @@ leaked key did not need it.
   background tabs. Compare-and-swap still prevents overwrites, but a stale tab may then report a conflict.
 - **New vaults are seeded with sample entries** (existing behaviour, unchanged here).
 - **Subscription details are what you enter.** KeyHaven doesn't fetch prices, verify renewals, charge or
-  cancel anything, and has no currency conversion. Totals, reminders and cancellation help are later work.
+  cancel anything, and has no currency conversion. Renewal reminders, calendar export and cancellation help
+  are later work.
 
 ---
 
@@ -357,6 +374,9 @@ npm run lint
 | Billing dates (month ends, leap years, custom intervals, time zones), money, derived status | `tests/billing-*.test.ts` |
 | Subscriptions encrypted at rest, in backups, through lock/unlock, legacy upgrade and Phase-1-style edits | `tests/subscriptions-store.test.ts` |
 | Subscription form: validation, dates kept as strings, distinct accounts | `tests/subscription-form.test.ts`, `tests/ui/subscriptions.test.tsx`, `tests/ui/provider-records.test.tsx` |
+| Overview totals: per currency, scheduled charges vs averages, trials, needs-attention, leap days, time zones | `tests/billing-forecast.test.ts`, `tests/billing-timezones.test.ts`, `tests/ui/subscriptions-overview.test.tsx` |
+| Account pages, safe "Manage at" links, links that survive unlocking | `tests/ui/account-page.test.tsx`, `tests/subscription-links.test.ts`, `tests/deep-link.test.ts`, `tests/ui/vault-deep-links.test.tsx` |
+| Persistent storage request, backup reminder, midnight rollover | `tests/persistence.test.ts`, `tests/ui/storage-persistence.test.tsx`, `tests/backup-reminder.test.ts`, `tests/ui/backup-reminder.test.tsx`, `tests/ui/use-today.test.tsx` |
 
 Golden fixtures in `tests/fixtures/` were generated with the pre-Phase-1 code, using synthetic passwords and
 data only. `tests/legacy/v1.ts` keeps a frozen copy of the legacy algorithms for these tests; application

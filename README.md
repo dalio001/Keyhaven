@@ -28,10 +28,11 @@ Extra protection: **auto-lock timer**, **clipboard auto-clear** (best effort), a
 
 - **Vault dashboard** — search, categories, favorites, ⌘K command palette, one-click copy with auto-clear, per-login TOTP codes.
 - **Subscriptions & accounts** — track what you pay for (Claude, ChatGPT, Gemini, Wispr Flow or any service): price and currency, monthly / annual / custom billing, next renewal, free trials, canceled-with-access-until, and who bills you (website, Apple, Google Play, other). Each subscription belongs to an account (work and personal accounts stay separate) and can link to a saved login. Encrypted like your logins; nothing is fetched or charged.
+- **Overview & account pages** — what's expected this month and in the next 30 days, trials ending soon, and estimates (monthly average, next 12 months), always per currency and never combined. Each account has a page with its cost, subscriptions, where they're managed and its logins.
 - **Create-vault wizard** — master password → optional authenticator QR → backup codes + "no recovery" acknowledgement, in 3 guided steps.
 - **Watchtower** — security score, weak / reused / old / breached password audit with one-click fixes, offline breach-style scan.
 - **Generator** — passwords, passphrases, PINs with entropy bits + crack-time estimates.
-- **Settings** — authenticator, backup codes, master password change, auto-lock, encrypted backup export/import/restore.
+- **Settings** — authenticator, backup codes, master password change, auto-lock, encrypted backup export/import/restore, whether the browser keeps the vault's storage. The vault page reminds you when a backup is due.
 
 ## Run it yourself (beginner guide)
 

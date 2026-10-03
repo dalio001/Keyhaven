@@ -3,10 +3,11 @@
  * App-shell guard: locked / no-vault → redirect /unlock (create mode when
  * there is no vault yet). Two-level layout: left tab rail + tab panels.
  * Tabs: Security methods (default) · Vault & data · Preferences · About.
+ * `?tab=data` (or another tab id) opens that tab.
  */
 
 import { useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Database, Info, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import SettingsShell from '@/components/settings/SettingsShell';
@@ -31,7 +32,9 @@ const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 
 export default function Settings() {
   const { status } = useVault();
-  const [tab, setTab] = useState<TabId>('security');
+  // /settings?tab=data opens Vault & data (e.g. from the backup reminder)
+  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState<TabId>(() => TABS.find((t) => t.id === params.get('tab'))?.id ?? 'security');
 
   if (status === 'loading') {
     return (
@@ -77,7 +80,10 @@ export default function Settings() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.06 * i, duration: 0.4, ease: EASE }}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  setTab(t.id);
+                  setParams({ tab: t.id }, { replace: true }); // Back returns to the tab you left
+                }}
                 className={cn(
                   'relative flex h-10 shrink-0 items-center gap-2.5 rounded-lg px-3.5 text-sm transition-colors lg:w-full',
                   active

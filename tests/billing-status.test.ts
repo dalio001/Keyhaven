@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compareStates, formatInterval, subscriptionState } from '@/lib/billing/status';
+import { addDays, occurrencesBetween } from '@/lib/billing/dates';
+import { compareStates, formatInterval, renewalAnchor, subscriptionState } from '@/lib/billing/status';
 import type { Subscription } from '@/lib/vault';
 
 const TODAY = '2026-10-02';
@@ -96,5 +97,30 @@ describe('subscription state (derived, never stored)', () => {
     expect(formatInterval({ unit: 'month', count: 1 })).toBe('/ month');
     expect(formatInterval({ unit: 'year', count: 1 })).toBe('/ year');
     expect(formatInterval({ unit: 'week', count: 2 })).toBe('every 2 weeks');
+  });
+});
+
+describe('renewal anchor (shared by the list and the Phase-4 overview)', () => {
+  it('trial end first, then the billing date; none when canceled', () => {
+    expect(renewalAnchor(sub({ billingAnchor: '2026-08-15' }))).toBe('2026-08-15');
+    expect(renewalAnchor(sub({ status: 'trial', trialEndsOn: '2026-10-09', billingAnchor: '2026-01-05' }))).toBe('2026-10-09');
+    expect(renewalAnchor(sub({ status: 'trial' }))).toBeNull();
+    expect(renewalAnchor(sub({ status: 'canceled', billingAnchor: '2026-08-15', accessEndsOn: '2026-10-20' }))).toBeNull();
+    expect(renewalAnchor(sub({ billingAnchor: '2026-02-30' }))).toBeNull();
+  });
+
+  it('the first date in the range is the date the list shows', () => {
+    const cases = [
+      sub({ billingAnchor: '2026-08-15' }),
+      sub({ billingAnchor: '2027-01-31' }),
+      sub({ billingAnchor: '2026-01-31', interval: { unit: 'month', count: 1 } }),
+      sub({ status: 'trial', trialEndsOn: '2026-10-09' }),
+      sub({ status: 'trial', trialEndsOn: '2026-09-20', billingAnchor: '2025-01-03' }),
+      sub({ billingAnchor: '2026-09-25', interval: { unit: 'week', count: 2 } }),
+    ];
+    for (const s of cases) {
+      const state = subscriptionState(s, TODAY);
+      expect(occurrencesBetween(renewalAnchor(s)!, s.interval, TODAY, addDays(TODAY, 400)!)[0]).toBe(state.date);
+    }
   });
 });

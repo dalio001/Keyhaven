@@ -61,10 +61,13 @@ export function newDraft(opts: {
   currency: string;
   login?: VaultEntry;
   accounts?: Account[];
+  /** add to this existing account (from its account page) */
+  accountId?: string;
 }): SubscriptionDraft {
   const preset = findPreset(opts.presetKey ?? undefined);
-  // a login that already belongs to an account: add the subscription to that account
-  const owner = opts.login?.accountId ? opts.accounts?.find((a) => a.id === opts.login?.accountId) : undefined;
+  // from an account page, or a login that already belongs to an account: add the subscription to that account
+  const ownerId = opts.accountId ?? opts.login?.accountId;
+  const owner = ownerId ? opts.accounts?.find((a) => a.id === ownerId) : undefined;
   const base: SubscriptionDraft = {
     serviceKey: preset?.key ?? null,
     serviceName: preset?.name ?? opts.login?.title ?? '',

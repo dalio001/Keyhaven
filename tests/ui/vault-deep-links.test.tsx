@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { VaultProvider } from '@/providers/VaultProvider';
 import Vault from '@/pages/Vault';
 import Unlock from '@/pages/Unlock';
+import Subscriptions from '@/pages/Subscriptions';
 import { clearSecret, offerSecret } from '@/lib/handoff';
 import { PW, addEntry, entry, freshVault } from '../helpers/controller';
 
@@ -97,5 +98,26 @@ describe('links into a locked vault survive unlocking', () => {
     expect((within(dialog).getByLabelText('Password') as HTMLInputElement).value).toBe(SECRET);
     await waitFor(() => expect(seen.at(-1)).toBe('/vault'));
     expect(seen.some((u) => u.includes(SECRET))).toBe(false);
+  });
+
+  it('a /subscriptions link reached while locked lands back on it after unlock (Phase 4)', async () => {
+    const x = await freshVault();
+    await x.c.lock();
+    render(
+      <VaultProvider controller={x.c}>
+        <MemoryRouter initialEntries={['/subscriptions?tab=accounts']}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/vault" element={<Vault />} />
+            <Route path="/subscriptions" element={<Subscriptions />} />
+            <Route path="/unlock" element={<Unlock />} />
+          </Routes>
+        </MemoryRouter>
+      </VaultProvider>,
+    );
+    fireEvent.change(await screen.findByLabelText('Master password'), { target: { value: PW } });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock vault' }));
+    await waitFor(() => expect(seen.at(-1)).toBe('/subscriptions?tab=accounts'), { timeout: 15_000 });
+    expect((await screen.findByRole('tab', { name: /Accounts/ })).getAttribute('aria-selected')).toBe('true');
   });
 });

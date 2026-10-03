@@ -115,6 +115,22 @@ export function occurrence(anchor: Ymd, interval: BillingInterval, k: number): Y
   }
 }
 
+/** the first k ≥ 0 whose billing date falls on or after day number `target` */
+function firstIndexOnOrAfter(a: Ymd, interval: BillingInterval, target: number): number {
+  if (dayNumber(a) >= target) return 0;
+  if (interval.unit === 'day' || interval.unit === 'week') {
+    const step = interval.count * (interval.unit === 'week' ? 7 : 1);
+    return Math.ceil((target - dayNumber(a)) / step);
+  }
+  const t = fromDayNumber(target);
+  const stepMonths = interval.count * (interval.unit === 'year' ? 12 : 1);
+  const monthsApart = t.y * 12 + t.m - (a.y * 12 + a.m);
+  let k = Math.max(0, Math.floor(monthsApart / stepMonths));
+  // month-end clamping can leave k one or two steps short of the target
+  while (dayNumber(occurrence(a, interval, k)) < target) k++;
+  return k;
+}
+
 /**
  * The first billing date on or after `today`, counted from a known billing
  * date. An anchor in the future is returned as is. `null` for invalid input.
@@ -123,21 +139,46 @@ export function nextOnOrAfter(anchor: CalendarDate, interval: BillingInterval, t
   const a = parseCalendarDate(anchor);
   const t = parseCalendarDate(today);
   if (!a || !t || !isValidInterval(interval)) return null;
-  const target = dayNumber(t);
-  if (dayNumber(a) >= target) return toCalendarDate(a);
+  return toCalendarDate(occurrence(a, interval, firstIndexOnOrAfter(a, interval, dayNumber(t))));
+}
 
-  let k: number;
-  if (interval.unit === 'day' || interval.unit === 'week') {
-    const step = interval.count * (interval.unit === 'week' ? 7 : 1);
-    k = Math.ceil((target - dayNumber(a)) / step);
-  } else {
-    const stepMonths = interval.count * (interval.unit === 'year' ? 12 : 1);
-    const monthsApart = t.y * 12 + t.m - (a.y * 12 + a.m);
-    k = Math.max(0, Math.floor(monthsApart / stepMonths));
-    // month-end clamping can leave k one or two steps short of today
-    while (dayNumber(occurrence(a, interval, k)) < target) k++;
+/**
+ * Every billing date from `from` to `to` (both included), each counted from
+ * the anchor — never from the previous date, so month-end clamping can't
+ * drift. At most `limit` dates; `[]` for invalid input or an empty range.
+ */
+export function occurrencesBetween(
+  anchor: CalendarDate,
+  interval: BillingInterval,
+  from: CalendarDate,
+  to: CalendarDate,
+  limit = 1000,
+): CalendarDate[] {
+  const a = parseCalendarDate(anchor);
+  const f = parseCalendarDate(from);
+  const t = parseCalendarDate(to);
+  if (!a || !f || !t || !isValidInterval(interval)) return [];
+  const end = dayNumber(t);
+  const out: CalendarDate[] = [];
+  for (let k = firstIndexOnOrAfter(a, interval, dayNumber(f)); out.length < limit; k++) {
+    const d = occurrence(a, interval, k);
+    if (dayNumber(d) > end) break;
+    out.push(toCalendarDate(d));
   }
-  return toCalendarDate(occurrence(a, interval, k));
+  return out;
+}
+
+/** `date` moved by `n` days; `null` for invalid input */
+export function addDays(date: CalendarDate, n: number): CalendarDate | null {
+  const p = parseCalendarDate(date);
+  return p ? toCalendarDate(fromDayNumber(dayNumber(p) + n)) : null;
+}
+
+/** first and last day of the month `date` is in */
+export function monthBounds(date: CalendarDate): { start: CalendarDate; end: CalendarDate } | null {
+  const p = parseCalendarDate(date);
+  if (!p) return null;
+  return { start: toCalendarDate({ ...p, d: 1 }), end: toCalendarDate({ ...p, d: daysInMonth(p.y, p.m) }) };
 }
 
 /** whole days from `from` to `to` (negative when `to` is earlier); `null` for invalid input */
@@ -167,6 +208,16 @@ export function formatCalendarDate(value: CalendarDate, locale?: string): string
   const p = parseCalendarDate(value);
   if (!p) return value;
   return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
+    dayNumber(p) * 86_400_000,
+  );
+}
+
+/** "October 2026" in the user's locale, for the month `date` is in (same UTC day-number trick) */
+export function formatMonthYear(value: CalendarDate, locale?: string): string {
+  const p = parseCalendarDate(value);
+  if (!p) return value;
+  // Gregorian months (the month window is Gregorian), whatever calendar the locale uses
+  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', timeZone: 'UTC', calendar: 'gregory' }).format(
     dayNumber(p) * 86_400_000,
   );
 }

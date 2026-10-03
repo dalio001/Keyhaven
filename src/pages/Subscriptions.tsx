@@ -8,19 +8,23 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AlertTriangle, Plus } from 'lucide-react';
 import VaultRing from '@/components/VaultRing';
 import SettingsShell from '@/components/settings/SettingsShell';
 import AccountFormDrawer from '@/components/subscriptions/AccountFormDrawer';
+import AccountPage from '@/components/subscriptions/AccountPage';
 import AccountsPanel from '@/components/subscriptions/AccountsPanel';
 import SubscriptionFormDrawer from '@/components/subscriptions/SubscriptionFormDrawer';
 import SubscriptionList from '@/components/subscriptions/SubscriptionList';
+import SubscriptionsOverview from '@/components/subscriptions/SubscriptionsOverview';
+import { parseView, selectedTab } from '@/components/subscriptions/view-params';
+import type { SubscriptionsTab } from '@/components/subscriptions/view-params';
 import { draftFromSubscription, newDraft } from '@/components/subscriptions/form-model';
 import { accountTitle } from '@/components/subscriptions/labels';
 import VaultToasts from '@/components/vault/VaultToasts';
 import { showVaultToast } from '@/components/vault/vault-utils';
-import { todayLocal } from '@/lib/billing/dates';
+import { useToday } from '@/hooks/useToday';
 import { cn } from '@/lib/utils';
 import type { Account, Subscription } from '@/lib/vault';
 import { useVault } from '@/providers/VaultProvider';
@@ -28,6 +32,7 @@ import type { AccountDraft, SaveSubscriptionInput } from '@/providers/VaultProvi
 
 export default function Subscriptions() {
   const { status } = useVault();
+  const { pathname, search } = useLocation();
   if (status === 'loading') {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
@@ -38,7 +43,8 @@ export default function Subscriptions() {
   }
   // same guard as the other app pages: nothing to unlock → create; locked → /unlock
   if (status === 'no-vault') return <Navigate to="/unlock?mode=create" replace />;
-  if (status !== 'unlocked') return <Navigate to="/unlock" replace />;
+  // remember the link (?account=, ?edit= …) so unlocking lands where it pointed
+  if (status !== 'unlocked') return <Navigate to="/unlock" replace state={{ next: pathname + search }} />;
   return (
     <SettingsShell title="Subscriptions">
       <SubscriptionsView />
@@ -65,8 +71,10 @@ function SubscriptionsView() {
   } = useVault();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const today = todayLocal(new Date());
-  const tab = params.get('tab') === 'accounts' ? 'accounts' : 'subscriptions';
+  const today = useToday();
+  const view = parseView(params);
+  const tab = selectedTab(view);
+  const pageAccountId = view.kind === 'account' ? view.accountId : null;
   const [accountForm, setAccountForm] = useState<AccountForm>({ open: false, account: null });
 
   /* the subscription drawer is driven by the URL, so links from a login open it */
@@ -82,10 +90,10 @@ function SubscriptionsView() {
     // the currency of the most recently changed subscription, else US dollars
     const recent = [...subscriptions].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))[0];
     const login = entries.find((e) => e.id === loginId);
-    return newDraft({ presetKey, currency: recent?.currency ?? 'USD', login, accounts });
+    return newDraft({ presetKey, currency: recent?.currency ?? 'USD', login, accounts, accountId: pageAccountId ?? undefined });
     // re-create only when the drawer opens for a different target
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing?.id, adding, presetKey, loginId]);
+  }, [editing?.id, adding, presetKey, loginId, pageAccountId]);
 
   const closeForm = useCallback(() => {
     setParams((p) => {
@@ -111,13 +119,18 @@ function SubscriptionsView() {
       next.delete('new');
       return next;
     });
-  const setTab = (t: 'subscriptions' | 'accounts') =>
+  const setTab = (t: SubscriptionsTab) =>
     setParams((p) => {
       const next = new URLSearchParams(p);
-      if (t === 'accounts') next.set('tab', 'accounts');
-      else next.delete('tab');
+      next.delete('account');
+      if (t === 'overview') next.delete('tab');
+      else next.set('tab', t);
       return next;
     });
+  const openAccount = (accountId: string) => {
+    setParams(new URLSearchParams({ account: accountId }));
+    window.scrollTo({ top: 0 });
+  };
   const openLogin = (entryId: string) => navigate(`/vault?entry=${encodeURIComponent(entryId)}`);
 
   /** toast only once the change is actually saved (encrypted) in this browser */
@@ -173,6 +186,7 @@ function SubscriptionsView() {
     const r = removeAccount(id);
     if (r === 'ok') {
       setAccountForm({ open: false, account: null });
+      if (pageAccountId === id) setTab('accounts'); // its page is gone
       void toastWhenSaved('Account removed — its logins stay in your vault');
     }
     return r;
@@ -203,12 +217,12 @@ function SubscriptionsView() {
         </div>
         <button
           type="button"
-          onClick={() => (tab === 'accounts' ? setAccountForm({ open: true, account: null }) : openAdd(null))}
+          onClick={() => (view.kind === 'accounts' ? setAccountForm({ open: true, account: null }) : openAdd(null))}
           disabled={!recordsWritable}
           className="bg-aurora flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[#04110B] transition-all hover:-translate-y-px hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
-          {tab === 'accounts' ? 'Add account' : 'Add subscription'}
+          {view.kind === 'accounts' ? 'Add account' : 'Add subscription'}
         </button>
       </div>
 
@@ -220,8 +234,12 @@ function SubscriptionsView() {
         </p>
       )}
 
-      <div role="tablist" aria-label="View" className="flex gap-1 rounded-xl border border-kh-line bg-kh-inset p-1 self-start">
-        {(['subscriptions', 'accounts'] as const).map((t) => (
+      <div
+        role="tablist"
+        aria-label="View"
+        className="flex max-w-full gap-1 self-start overflow-x-auto whitespace-nowrap rounded-xl border border-kh-line bg-kh-inset p-1"
+      >
+        {(['overview', 'subscriptions', 'accounts'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -233,12 +251,35 @@ function SubscriptionsView() {
               tab === t ? 'bg-kh-elevated text-kh-primary' : 'text-kh-muted hover:text-kh-primary',
             )}
           >
-            {t === 'subscriptions' ? `Subscriptions (${subscriptions.length})` : `Accounts (${accounts.length})`}
+            {t === 'overview' ? 'Overview' : t === 'subscriptions' ? `Subscriptions (${subscriptions.length})` : `Accounts (${accounts.length})`}
           </button>
         ))}
       </div>
 
-      {tab === 'subscriptions' ? (
+      {tab === 'overview' && subscriptions.length > 0 ? (
+        <SubscriptionsOverview
+          subscriptions={subscriptions}
+          accounts={accounts}
+          today={today}
+          // an account this version can't show (malformed) has no page: open the subscription instead
+          onOpen={(sub) => (accounts.some((a) => a.id === sub.accountId) ? openAccount(sub.accountId) : openEdit(sub))}
+          onShowList={() => setTab('subscriptions')}
+        />
+      ) : view.kind === 'account' ? (
+        <AccountPage
+          accountId={view.accountId}
+          accounts={accounts}
+          subscriptions={subscriptions}
+          entries={entries}
+          today={today}
+          canEdit={recordsWritable}
+          onBack={() => setTab('accounts')}
+          onEditAccount={(account) => setAccountForm({ open: true, account })}
+          onEditSubscription={openEdit}
+          onAddSubscription={() => openAdd(null)}
+          onOpenLogin={openLogin}
+        />
+      ) : tab !== 'accounts' ? (
         <SubscriptionList
           subscriptions={subscriptions}
           accounts={accounts}
@@ -253,6 +294,7 @@ function SubscriptionsView() {
           accounts={accounts}
           subscriptions={subscriptions}
           entries={entries}
+          onOpen={(account) => openAccount(account.id)}
           onEdit={(account) => setAccountForm({ open: true, account })}
           onAdd={() => setAccountForm({ open: true, account: null })}
           onOpenLogin={openLogin}

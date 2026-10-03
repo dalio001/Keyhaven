@@ -54,7 +54,7 @@ describe('Subscriptions page', () => {
 
   it('adds a ChatGPT "Work" subscription and shows its price and next renewal', async () => {
     const { c, storage } = await freshVault();
-    renderAt(c, '/subscriptions');
+    renderAt(c, '/subscriptions?tab=subscriptions');
     await screen.findByText('No subscriptions yet');
     await addChatGpt({ label: 'Work', amount: '20', date: '2026-10-15' });
 
@@ -71,7 +71,7 @@ describe('Subscriptions page', () => {
 
   it('a personal ChatGPT account stays distinct from the work one', async () => {
     const { c } = await freshVault();
-    renderAt(c, '/subscriptions');
+    renderAt(c, '/subscriptions?tab=subscriptions');
     await addChatGpt({ label: 'Work', amount: '20' });
     await screen.findByText('ChatGPT · Work');
     await addChatGpt({ label: 'Personal', amount: '20', newAccount: true });
@@ -87,7 +87,7 @@ describe('Subscriptions page', () => {
   it('deleting a subscription keeps its account and login; Undo brings it back', async () => {
     const { c } = await freshVault();
     addEntry(c, entry('cg', { title: 'ChatGPT login', username: 'me@example.test' }));
-    renderAt(c, '/subscriptions');
+    renderAt(c, '/subscriptions?tab=subscriptions');
     await addChatGpt({ label: 'Work', amount: '20', login: 'cg' });
     fireEvent.click(await screen.findByRole('button', { name: /^Edit ChatGPT · Work/ }));
     fireEvent.click(await screen.findByRole('button', { name: /Delete this subscription/ }));
@@ -106,7 +106,7 @@ describe('Subscriptions page', () => {
 
   it('KH-04: a billing date filled in without an input event (autofill, scripts) is saved and shown', async () => {
     const { c, storage } = await freshVault();
-    renderAt(c, '/subscriptions');
+    renderAt(c, '/subscriptions?tab=subscriptions');
     const dialog = await openAddForm();
     fireEvent.click(within(within(dialog).getByRole('radiogroup', { name: 'Service' })).getByRole('radio', { name: 'Custom' }));
     fill('Service name', 'QA Service');
@@ -134,7 +134,7 @@ describe('Subscriptions page', () => {
 
   it('KH-04: a date set without an event and then blurred updates the form before saving', async () => {
     const { c } = await freshVault();
-    renderAt(c, '/subscriptions');
+    renderAt(c, '/subscriptions?tab=subscriptions');
     const dialog = await openAddForm();
     fireEvent.click(within(within(dialog).getByRole('radiogroup', { name: 'Service' })).getByRole('radio', { name: 'Claude' }));
     fill('Price', '18');
@@ -147,7 +147,7 @@ describe('Subscriptions page', () => {
 
   it('shows what is wrong instead of saving', async () => {
     const { c } = await freshVault();
-    renderAt(c, '/subscriptions');
+    renderAt(c, '/subscriptions?tab=subscriptions');
     const dialog = await openAddForm();
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Free trial' }));
     fill('Price', '20.999');
@@ -161,7 +161,7 @@ describe('Subscriptions page', () => {
   it("the login's detail drawer shows its account and subscription", async () => {
     const { c } = await freshVault();
     addEntry(c, entry('cg', { title: 'ChatGPT login' }));
-    const view = renderAt(c, '/subscriptions');
+    const view = renderAt(c, '/subscriptions?tab=subscriptions');
     await addChatGpt({ label: 'Work', amount: '20', date: '2026-10-15', login: 'cg' });
     await screen.findByText('ChatGPT · Work');
     view.unmount();
@@ -233,7 +233,7 @@ describe('date fields stay strings end to end', () => {
     async (tz) => {
       process.env.TZ = tz;
       const { c, storage } = await freshVault();
-      renderAt(c, '/subscriptions');
+      renderAt(c, '/subscriptions?tab=subscriptions');
       const dialog = await openAddForm();
       fireEvent.click(within(dialog).getByRole('radio', { name: 'Claude' }));
       fill('Price', '18');
@@ -273,6 +273,7 @@ describe('date fields stay strings end to end', () => {
       ...readdirSync(join(root, 'components', 'subscriptions')).map((f) => join(root, 'components', 'subscriptions', f)),
       join(root, 'pages', 'Subscriptions.tsx'),
       join(root, 'lib', 'records.ts'),
+      join(root, 'hooks', 'useToday.ts'),
     ];
     for (const file of files) {
       const code = readFileSync(file, 'utf8')

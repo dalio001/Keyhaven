@@ -10,10 +10,11 @@ import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { ArrowRight, FileDown, Smartphone, Timer } from 'lucide-react';
 import type { VaultEntry } from '@/lib/vault';
+import { BACKUP_MAX_AGE_DAYS } from '@/lib/backupReminder';
 
 const EXPO = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
-const BACKUP_MAX_AGE_MS = 30 * 86_400_000;
+const BACKUP_MAX_AGE_MS = BACKUP_MAX_AGE_DAYS * 86_400_000;
 
 interface Tip {
   icon: typeof Timer;

@@ -30,6 +30,7 @@ import { downloadBackupFile } from '@/lib/download';
 import { KhButton, SectionCard, Spinner, StatusChip } from './ui';
 import { cn } from '@/lib/utils';
 import { LAST_EXPORT_KEY } from '@/lib/lastExport';
+import { usePersistentStorage } from '@/hooks/usePersistentStorage';
 
 const IMPORT_ERRORS: Record<ImportFailure, string> = {
   'invalid-file': 'This file is not a valid KeyHaven backup.',
@@ -483,10 +484,38 @@ function DangerZoneCard() {
 
 /* ------------------------------------------------------------------ */
 
+function StorageCard() {
+  const { state, ask } = usePersistentStorage();
+  const chip =
+    state === 'persisted' ? (
+      <StatusChip tone="mint">Kept until you delete it</StatusChip>
+    ) : state === 'not-persisted' ? (
+      <StatusChip tone="warning">The browser may clear it when space runs low</StatusChip>
+    ) : (
+      <StatusChip tone="faint">{state === 'checking' ? 'Checking…' : "This browser doesn't say"}</StatusChip>
+    );
+  return (
+    <SectionCard
+      title="Browser storage"
+      helper="Browsers can clear a site's data when the disk is nearly full. KeyHaven asks this browser to keep your vault. Not a backup — keep exporting encrypted backups."
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        {chip}
+        {state === 'not-persisted' && (
+          <KhButton variant="secondary" onClick={() => void ask()}>
+            Ask the browser to keep it
+          </KhButton>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 export default function VaultDataTab() {
   return (
     <div className="space-y-6">
       <BackupCard />
+      <StorageCard />
       <DevicesCard />
       <DangerZoneCard />
     </div>

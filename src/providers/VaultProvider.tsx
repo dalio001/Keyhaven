@@ -53,6 +53,7 @@ import type {
 } from '@/lib/store/controller';
 import type { MigratedFrom, VaultPayload } from '@/lib/store/format';
 import { createIdbStorage } from '@/lib/store/storage';
+import { requestPersistence } from '@/lib/persistence';
 import { createBroadcastTabChannel } from '@/lib/store/tabChannel';
 
 export type { SecondFactor, UnlockResult, VaultStatus } from '@/lib/store/controller';
@@ -223,6 +224,15 @@ export function VaultProvider({
 
   const status = snap.status;
   const settings = snap.data?.settings ?? DEFAULT_SETTINGS;
+
+  // ask the browser once per page load to keep the vault's storage (it may clear site data when the disk is
+  // nearly full). Only after unlock or create — Firefox shows a prompt; Chromium decides silently.
+  const askedPersistRef = useRef(false);
+  useEffect(() => {
+    if (status !== 'unlocked' || askedPersistRef.current) return;
+    askedPersistRef.current = true;
+    void requestPersistence();
+  }, [status]);
   const accounts = useMemo(() => (snap.data ? records.listAccounts(snap.data) : NO_ACCOUNTS), [snap.data]);
   const subscriptions = useMemo(
     () => (snap.data ? records.listSubscriptions(snap.data) : NO_SUBSCRIPTIONS),

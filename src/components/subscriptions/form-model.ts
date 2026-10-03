@@ -11,6 +11,7 @@
 import { isCalendarDate } from '@/lib/billing/dates';
 import { isCurrencyCode, minorToInput, parseMoneyInput } from '@/lib/billing/money';
 import { findPreset } from '@/lib/servicePresets';
+import { safeExternalUrl } from './links';
 import type { Account, BillingProvider, BillingUnit, Subscription, SubscriptionStatus, VaultEntry } from '@/lib/vault';
 import type { SaveSubscriptionInput } from '@/providers/VaultProvider';
 
@@ -40,6 +41,8 @@ export interface SubscriptionDraft {
   accessEndsOn: string;
   provider: BillingProvider;
   providerOther: string;
+  /** "Manage or cancel link" as typed */
+  manageUrl: string;
   notes: string;
 }
 
@@ -52,7 +55,8 @@ export type DraftField =
   | 'billingDate'
   | 'trialEndsOn'
   | 'accessEndsOn'
-  | 'providerOther';
+  | 'providerOther'
+  | 'manageUrl';
 
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
@@ -88,6 +92,7 @@ export function newDraft(opts: {
     accessEndsOn: '',
     provider: 'website',
     providerOther: '',
+    manageUrl: '',
     notes: '',
   };
   if (!owner) return base;
@@ -127,6 +132,7 @@ export function draftFromSubscription(sub: Subscription, account: Account | unde
     accessEndsOn: typeof sub.accessEndsOn === 'string' ? sub.accessEndsOn : '',
     provider: sub.provider === 'apple' || sub.provider === 'google-play' || sub.provider === 'other' ? sub.provider : 'website',
     providerOther: typeof sub.providerOther === 'string' ? sub.providerOther : '',
+    manageUrl: typeof sub.manageUrl === 'string' ? sub.manageUrl : '',
     notes: typeof sub.notes === 'string' ? sub.notes : '',
   };
 }
@@ -184,6 +190,9 @@ export function validateDraft(
     errors.accessEndsOn = 'Enter a real date.';
   }
   if (d.provider === 'other' && !d.providerOther.trim()) errors.providerOther = 'Who bills you?';
+  // only an http(s) address is kept (never javascript:, data: or user:password@)
+  const manageUrl = d.manageUrl.trim() ? safeExternalUrl(d.manageUrl) : null;
+  if (d.manageUrl.trim() && !manageUrl) errors.manageUrl = 'Enter a web address, like https://example.com/account.';
 
   if (Object.keys(errors).length > 0 || amountMinor === null) return { errors, value: null };
 
@@ -200,6 +209,7 @@ export function validateDraft(
     ...(d.status === 'trial' ? { trialEndsOn: d.trialEndsOn } : {}),
     ...(d.status === 'canceled' && d.accessEndsOn ? { accessEndsOn: d.accessEndsOn } : {}),
     ...(d.provider === 'other' ? { providerOther: d.providerOther.trim() } : {}),
+    ...(manageUrl ? { manageUrl } : {}),
     ...(d.notes.trim() ? { notes: d.notes.trim() } : {}),
   };
   const preset = findPreset(d.serviceKey ?? undefined);

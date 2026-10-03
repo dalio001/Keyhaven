@@ -15,10 +15,24 @@ import { subscriptionState } from '@/lib/billing/status';
 import type { Account, Subscription, VaultEntry } from '@/lib/vault';
 import CalendarExport from './CalendarExport';
 import { accountTitle, manageHint, priceText } from './labels';
-import { displayHost, safeExternalUrl } from './links';
+import { STORE_SUBSCRIPTION_PAGES, displayHost, safeExternalUrl } from './links';
 import SubscriptionList from './SubscriptionList';
 
 const SECTION_TITLE = 'font-display text-lg font-semibold text-kh-primary';
+
+/** a link out of KeyHaven: a new tab, with no opener and no referrer */
+function OutLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1.5 self-start text-sm font-medium text-kh-cyan transition-colors hover:text-kh-mint"
+    >
+      {children} <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+    </a>
+  );
+}
 
 export default function AccountPage({
   accountId,
@@ -69,7 +83,18 @@ export default function AccountPage({
 
   const website = safeExternalUrl(account.website);
   const live = subs.filter((s) => subscriptionState(s, today).kind !== 'ended');
-  const providers = [...new Set(live.map((s) => s.provider))];
+  // links saved on the subscriptions themselves (Phase 5), one per address
+  const savedLinks: { url: string; plan: string }[] = [];
+  for (const s of live) {
+    const url = safeExternalUrl(s.manageUrl);
+    if (!url) continue;
+    const plan = typeof s.plan === 'string' ? s.plan.trim() : '';
+    const seen = savedLinks.find((l) => l.url === url);
+    if (seen) seen.plan = seen.plan === plan ? plan : ''; // shared by several plans: name none
+    else savedLinks.push({ url, plan });
+  }
+  // the account's website, for subscriptions billed there without a link of their own
+  const needsWebsite = live.some((s) => s.provider === 'website' && !safeExternalUrl(s.manageUrl));
   const next = overview.upcoming[0];
 
   return (
@@ -146,27 +171,29 @@ export default function AccountPage({
           Where it's managed
         </h4>
         {live.length === 0 && <p className="text-sm text-kh-muted">No active subscriptions to manage.</p>}
-        {providers.includes('website') &&
+        {savedLinks.map(({ url, plan }) => (
+          <OutLink key={url} href={url}>
+            Manage or cancel{plan ? ` ${plan}` : ''} at {displayHost(url)}
+          </OutLink>
+        ))}
+        {needsWebsite &&
           (website ? (
-            <a
-              href={website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 self-start text-sm font-medium text-kh-cyan transition-colors hover:text-kh-mint"
-            >
-              Manage at {displayHost(website)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-            </a>
+            <OutLink href={website}>Manage at {displayHost(website)}</OutLink>
           ) : (
             <p className="text-sm text-kh-muted">Billed through the service's website — no website saved for this account.</p>
           ))}
         {live
           .filter((s) => s.provider !== 'website')
           .filter((s, i, all) => all.findIndex((o) => manageHint(o) === manageHint(s)) === i)
-          .map((s) => (
-            <p key={s.id} className="text-sm text-kh-muted">
-              {manageHint(s)}
-            </p>
-          ))}
+          .map((s) => {
+            const store = s.provider === 'apple' || s.provider === 'google-play' ? STORE_SUBSCRIPTION_PAGES[s.provider] : null;
+            return (
+              <div key={s.id} className="flex flex-col gap-1">
+                {store && <OutLink href={store.href}>{store.label}</OutLink>}
+                <p className="text-sm text-kh-muted">{manageHint(s)}</p>
+              </div>
+            );
+          })}
         <p className="text-xs text-kh-faint">KeyHaven doesn't contact the service or cancel anything for you.</p>
       </section>
 

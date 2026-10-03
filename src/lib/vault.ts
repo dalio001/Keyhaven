@@ -105,6 +105,8 @@ export interface Subscription {
   provider: BillingProvider;
   /** provider name when `provider` is 'other' */
   providerOther?: string;
+  /** where to manage or cancel it: an http(s) link the user saved, opened only when they click it */
+  manageUrl?: string;
   notes?: string;
   /** ISO timestamps */
   createdAt: string;

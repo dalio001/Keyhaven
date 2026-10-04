@@ -25,3 +25,13 @@ export function displayHost(url: string): string {
     return url;
   }
 }
+
+/**
+ * The app stores' own subscription pages, for subscriptions billed through
+ * them — where you manage or cancel. Fixed, official addresses; nothing is
+ * fetched, the user opens them.
+ */
+export const STORE_SUBSCRIPTION_PAGES = {
+  apple: { label: 'Manage in the App Store', href: 'https://apps.apple.com/account/subscriptions' },
+  'google-play': { label: 'Manage in Google Play', href: 'https://play.google.com/store/account/subscriptions' },
+} as const;

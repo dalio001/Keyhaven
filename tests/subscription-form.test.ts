@@ -110,19 +110,31 @@ describe('subscription form model', () => {
     expect(duplicateAccount(ACCOUNTS, draft({ label: 'Side project' }))).toBeUndefined();
   });
 
+  it('a "Manage or cancel" link is saved as a web address; anything else is refused', () => {
+    expect(newDraft({ currency: 'USD' }).manageUrl).toBe('');
+    expect(validateDraft(draft(), ACCOUNTS).value!.fields).not.toHaveProperty('manageUrl');
+    expect(validateDraft(draft({ manageUrl: '  chatgpt.com/account/manage ' }), ACCOUNTS).value!.fields.manageUrl).toBe('https://chatgpt.com/account/manage');
+    expect(validateDraft(draft({ manageUrl: 'https://example.test/cancel?x=1' }), ACCOUNTS).value!.fields.manageUrl).toBe('https://example.test/cancel?x=1');
+    for (const bad of ['javascript:alert(1)', 'data:text/html,hi', 'https://user:pw@example.test/', 'ftp://example.test/']) {
+      const r = validateDraft(draft({ manageUrl: bad }), ACCOUNTS);
+      expect(r.value, bad).toBeNull();
+      expect(r.errors.manageUrl, bad).toBe('Enter a web address, like https://example.com/account.');
+    }
+  });
+
   it('editing round-trips a stored subscription', () => {
     const sub: Subscription = {
       id: 's1', accountId: 'w', plan: 'Team', amountMinor: 2500, currency: 'EUR', interval: { unit: 'month', count: 3 },
       billingAnchor: '2027-01-31', status: 'canceled', accessEndsOn: '2027-04-30', provider: 'apple', notes: 'x',
-      createdAt: NOW, updatedAt: NOW,
+      manageUrl: 'https://example.test/manage', createdAt: NOW, updatedAt: NOW,
     };
     const d = draftFromSubscription(sub, work);
-    expect(d).toMatchObject({ accountChoice: 'w', amount: '25.00', intervalPreset: 'custom', customCount: '3', customUnit: 'month', status: 'canceled' });
+    expect(d).toMatchObject({ accountChoice: 'w', amount: '25.00', intervalPreset: 'custom', customCount: '3', customUnit: 'month', status: 'canceled', manageUrl: 'https://example.test/manage' });
     const { value } = validateDraft(d, ACCOUNTS);
     expect(value!.account).toEqual({ id: 'w' });
     expect(value!.fields).toEqual({
       plan: 'Team', amountMinor: 2500, currency: 'EUR', interval: { unit: 'month', count: 3 }, status: 'canceled',
-      provider: 'apple', billingAnchor: '2027-01-31', accessEndsOn: '2027-04-30', notes: 'x',
+      provider: 'apple', billingAnchor: '2027-01-31', accessEndsOn: '2027-04-30', notes: 'x', manageUrl: 'https://example.test/manage',
     });
   });
 });

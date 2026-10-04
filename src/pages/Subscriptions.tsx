@@ -15,6 +15,7 @@ import SettingsShell from '@/components/settings/SettingsShell';
 import AccountFormDrawer from '@/components/subscriptions/AccountFormDrawer';
 import AccountPage from '@/components/subscriptions/AccountPage';
 import AccountsPanel from '@/components/subscriptions/AccountsPanel';
+import RenewalReminder from '@/components/subscriptions/RenewalReminder';
 import SubscriptionFormDrawer from '@/components/subscriptions/SubscriptionFormDrawer';
 import SubscriptionList from '@/components/subscriptions/SubscriptionList';
 import SubscriptionsOverview from '@/components/subscriptions/SubscriptionsOverview';
@@ -257,14 +258,17 @@ function SubscriptionsView() {
       </div>
 
       {tab === 'overview' && subscriptions.length > 0 ? (
-        <SubscriptionsOverview
-          subscriptions={subscriptions}
-          accounts={accounts}
-          today={today}
-          // an account this version can't show (malformed) has no page: open the subscription instead
-          onOpen={(sub) => (accounts.some((a) => a.id === sub.accountId) ? openAccount(sub.accountId) : openEdit(sub))}
-          onShowList={() => setTab('subscriptions')}
-        />
+        <>
+          <RenewalReminder className="" />
+          <SubscriptionsOverview
+            subscriptions={subscriptions}
+            accounts={accounts}
+            today={today}
+            // an account this version can't show (malformed) has no page: open the subscription instead
+            onOpen={(sub) => (accounts.some((a) => a.id === sub.accountId) ? openAccount(sub.accountId) : openEdit(sub))}
+            onShowList={() => setTab('subscriptions')}
+          />
+        </>
       ) : view.kind === 'account' ? (
         <AccountPage
           accountId={view.accountId}

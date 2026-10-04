@@ -3,6 +3,8 @@
  * Device-level preferences persisted to localStorage under the documented
  * `keyhaven:prefs` key (other surfaces read the same key; vault-critical
  * settings live in the encrypted VaultSettings instead — see AutoLockCard).
+ * Renewal reminders are about your subscriptions, so they are saved in the
+ * encrypted VaultSettings too (RenewalRemindersCard).
  */
 
 import { useEffect, useState } from 'react';
@@ -18,7 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SectionCard } from './ui';
+import { REMINDER_DAY_CHOICES, reminderDays } from '@/lib/billing/reminders';
 import { cn } from '@/lib/utils';
+import { useVault } from '@/providers/VaultProvider';
 
 export const PREFS_KEY = 'keyhaven:prefs';
 
@@ -236,6 +240,47 @@ export default function PreferencesTab() {
           </PrefRow>
         </div>
       </SectionCard>
+
+      <RenewalRemindersCard />
     </div>
+  );
+}
+
+const dayLabel = (n: number) => (n === 0 ? 'Off' : n === 1 ? '1 day' : `${n} days`);
+
+/** how many days ahead to remind about renewals — saved in the encrypted vault settings */
+function RenewalRemindersCard() {
+  const { settings, updateSettings, flush } = useVault();
+  const days = reminderDays(settings);
+  // a value a later version saved is shown as is, never silently reset
+  const choices = (REMINDER_DAY_CHOICES as readonly number[]).includes(days)
+    ? [...REMINDER_DAY_CHOICES]
+    : [...REMINDER_DAY_CHOICES, days].sort((a, b) => a - b);
+
+  const change = (v: string) => {
+    if (!updateSettings({ renewalReminderDays: Number(v) })) {
+      toast.error('The vault is locked or out of date — preference not saved');
+      return;
+    }
+    flush().then(
+      () => toast.success('Preference saved', { duration: 1400 }),
+      () => toast.error('Preference not saved to this browser yet — KeyHaven is retrying'),
+    );
+  };
+
+  return (
+    <SectionCard title="Renewal reminders" helper="Saved in your encrypted vault, so they follow your backups.">
+      <PrefRow
+        title="Remind me before renewals"
+        helper="Shown in KeyHaven while it's open, and as alarms in the calendar files you export from Subscriptions."
+      >
+        <Segmented
+          ariaLabel="Remind me before renewals"
+          value={String(days)}
+          onChange={change}
+          options={choices.map((n) => ({ value: String(n), label: dayLabel(n) }))}
+        />
+      </PrefRow>
+    </SectionCard>
   );
 }

@@ -135,7 +135,7 @@ describe('records: subscriptions', () => {
   });
 
   it('editing merges unknown fields and drops optional fields that were cleared', () => {
-    const stored = { ...sub('s1', 'a1', { status: 'trial', trialEndsOn: '2026-10-20' }), futureField: 1 };
+    const stored = { ...sub('s1', 'a1', { status: 'trial', trialEndsOn: '2026-10-20', manageUrl: 'https://example.test/manage' }), futureField: 1 };
     const p = payload({ accounts: [account('a1')], subscriptions: [stored] });
     const edited = sub('s1', 'a1', { status: 'active', plan: 'Pro', updatedAt: LATER });
     const next = upsertSubscription(p, edited)!;

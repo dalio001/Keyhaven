@@ -1,7 +1,8 @@
 /**
  * Overview — what the recorded subscriptions add up to (Phase 4): charges
  * expected this month and in the next 30 days, trials ending soon, and the
- * estimates (monthly average, next 12 months). Per currency only — amounts in
+ * estimates (monthly average, next 12 months), and "Add to calendar"
+ * (Phase 5). Per currency only — amounts in
  * different currencies are never combined or converted. Derived on the fly;
  * viewing never writes to the vault.
  */
@@ -14,6 +15,7 @@ import { subscriptionOverview } from '@/lib/billing/forecast';
 import type { UpcomingCharge } from '@/lib/billing/forecast';
 import { formatMoney } from '@/lib/billing/money';
 import type { Account, Subscription } from '@/lib/vault';
+import CalendarExport from './CalendarExport';
 import { accountTitle, priceText } from './labels';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -98,9 +100,12 @@ export default function SubscriptionsOverview({
           </section>
 
           <section aria-labelledby="ov-next" className="flex flex-col gap-3">
-            <SectionTitle id="ov-next" icon={CalendarClock}>
-              Next 30 days
-            </SectionTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle id="ov-next" icon={CalendarClock}>
+                Next 30 days
+              </SectionTitle>
+              <CalendarExport subscriptions={subscriptions} accounts={accounts} />
+            </div>
             {o.upcoming.length === 0 ? (
               <p className="text-sm text-kh-muted">Nothing renews in the next 30 days.</p>
             ) : (

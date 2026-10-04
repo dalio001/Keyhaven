@@ -26,6 +26,7 @@ import EntryList from '@/components/vault/EntryList';
 import FilterBar from '@/components/vault/FilterBar';
 import StatsStrip from '@/components/vault/StatsStrip';
 import BackupReminder from '@/components/vault/BackupReminder';
+import RenewalReminder from '@/components/subscriptions/RenewalReminder';
 import VaultToasts from '@/components/vault/VaultToasts';
 import {
   buildStrengthMap,
@@ -337,6 +338,7 @@ function VaultDashboard() {
           className="mx-auto w-full max-w-[1080px] px-4 pt-6 min-[900px]:px-8"
         >
           <BackupReminder />
+          <RenewalReminder />
           <StatsStrip stats={stats} active={statFilter} onSelect={setStatFilter} />
 
           <FilterBar

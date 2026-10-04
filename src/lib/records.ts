@@ -161,6 +161,7 @@ const OPTIONAL_SUBSCRIPTION_FIELDS = [
   'trialEndsOn',
   'accessEndsOn',
   'providerOther',
+  'manageUrl',
   'notes',
 ] as const satisfies readonly (keyof Subscription)[];
 
